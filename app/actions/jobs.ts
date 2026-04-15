@@ -5,7 +5,10 @@ import type { Job, JobStatus, JobUrgency } from '@/types';
 // Helper to parse tasks from JSONB (can be string[] or {name:string}[])
 function parseTasks(tasks: any[]): string[] {
   if (!tasks || !Array.isArray(tasks)) return [];
-  return tasks.map((t) => (typeof t === 'string' ? t : t.name ?? t.task ?? String(t)));
+  // Filter out meta-objects like 'size' and 'instruction' when displaying tasks
+  return tasks
+    .filter((t) => typeof t === 'string' || (typeof t === 'object' && t.type !== 'size' && t.type !== 'instruction'))
+    .map((t) => (typeof t === 'string' ? t : t.name ?? t.task ?? String(t)));
 }
 
 export async function createJob(jobData: {
@@ -14,20 +17,39 @@ export async function createJob(jobData: {
   address: string;
   distance: number;
   price: number;
+  size: string;
+  customInstructions?: string;
 }): Promise<Job> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Unauthorized');
+
+  // Fetch customer name for persistence
+  const { data: profile } = await (supabase as any)
+    .from('profiles')
+    .select('full_name')
+    .eq('id', user.id)
+    .single();
+
+  // Inject meta into tasks JSONB
+  const tasksWithMeta: any[] = [...jobData.tasks];
+  if (jobData.size) {
+    tasksWithMeta.push({ type: 'size', value: jobData.size });
+  }
+  if (jobData.customInstructions) {
+    tasksWithMeta.push({ type: 'instruction', value: jobData.customInstructions });
+  }
 
   const { data, error } = await (supabase as any)
     .from('jobs')
     .insert([{
       customer_id: user.id,
+      customer_name: profile?.full_name,
       urgency: jobData.urgency,
       location_address: jobData.address,
       distance: jobData.distance,
       price_amount: jobData.price,
       status: 'OPEN',
-      tasks: jobData.tasks,
+      tasks: tasksWithMeta,
     }])
     .select()
     .single();
@@ -143,12 +165,28 @@ export async function claimJob(jobId: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Unauthorized');
 
+  // Fetch employee name and phone
+  const { data: profile } = await (supabase as any)
+    .from('profiles')
+    .select('full_name, phone')
+    .eq('id', user.id)
+    .single();
+
   const { error } = await (supabase as any).rpc('claim_job', {
     p_job_id: jobId,
     p_employee_id: user.id,
   });
 
   if (error) throw error;
+
+  // Persist the worker name and phone for history
+  await (supabase as any)
+    .from('jobs')
+    .update({ 
+      worker_name: profile?.full_name,
+      worker_phone: profile?.phone 
+    })
+    .eq('id', jobId);
 }
 
 export async function updateJobStatus(
@@ -159,9 +197,14 @@ export async function updateJobStatus(
 ): Promise<void> {
   const updateData: Record<string, any> = { status };
 
-  // Database column is proof_of_work (JSONB), not proof_urls
+  // Database column is proof_of_work (JSONB).
+  // If we have a description but no separate column, we store it as an object entry in the array.
   if (proofOfWork) {
-    updateData.proof_of_work = proofOfWork;
+    const proofData: any[] = [...proofOfWork];
+    if (proofDescription) {
+      proofData.push({ type: 'comment', content: proofDescription });
+    }
+    updateData.proof_of_work = proofData;
   }
 
   const { error } = await (supabase as any)
@@ -211,12 +254,25 @@ export async function getNearbyJobs(lat: number, lng: number, radiusMeters = 500
 // Normalize job from DB to our Job type
 // Handles JSONB tasks (can be string[] or object[]) and worker_id -> employee_id mapping
 function normalizeJob(raw: any): Job {
+  const rawTasks = Array.isArray(raw.tasks) ? raw.tasks : [];
+  const sizeObj = rawTasks.find((t: any) => t && typeof t === 'object' && t.type === 'size');
+  const instrObj = rawTasks.find((t: any) => t && typeof t === 'object' && t.type === 'instruction');
+
+  const proof_of_work = Array.isArray(raw.proof_of_work) ? raw.proof_of_work : [];
+  const commentObj = proof_of_work.find((p: any) => p && typeof p === 'object' && p.type === 'comment');
+  const proof_urls = proof_of_work
+    .filter((p: any) => p && (typeof p === 'string' || (typeof p === 'object' && p.type !== 'comment')))
+    .map((p: any) => (typeof p === 'string' ? p : p.url ?? String(p)));
+
   return {
     ...raw,
-    tasks: parseTasks(raw.tasks ?? []),
-    proof_urls: Array.isArray(raw.proof_of_work)
-      ? raw.proof_of_work.map((p: any) => (typeof p === 'string' ? p : p.url ?? String(p)))
-      : [],
+    tasks: parseTasks(rawTasks),
+    size: sizeObj?.value || raw.size,
+    custom_instructions: instrObj?.value || raw.custom_instructions,
+    proof_urls,
+    proof_description: commentObj?.content || raw.proof_description,
     employee_id: raw.worker_id, // map worker_id to employee_id for our type
+    employee_name: raw.worker_name, // map worker_name to employee_name for our type
   } as Job;
 }
+

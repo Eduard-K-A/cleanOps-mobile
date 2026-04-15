@@ -6,7 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useColors } from '@/lib/themeContext';
+import { useTheme } from '@/lib/themeContext';
 import { getBalance, addMoney, withdraw } from '@/app/actions/payments';
 import { getCustomerJobs } from '@/app/actions/jobs';
 import { useAuth } from '@/lib/authContext';
@@ -16,7 +16,7 @@ type ModalMode = 'deposit' | 'withdraw' | null;
 
 export default function CustomerPaymentScreen() {
   const router = useRouter();
-  const C = useColors();
+  const { colors: C, statusColors: S } = useTheme();
   const insets = useSafeAreaInsets();
   const { refreshProfile } = useAuth();
 
@@ -159,7 +159,7 @@ export default function CustomerPaymentScreen() {
 
       {/* Deposit / Withdraw Modal */}
       <Modal visible={!!modalMode} animationType="slide" transparent>
-        <KeyboardAvoidingView style={st.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <KeyboardAvoidingView style={st.modalOverlay} behavior="padding">
           <View style={[st.modalSheet, { backgroundColor: C.surface }]}>
             <View style={[st.modalHeader, { borderBottomColor: C.divider }]}>
               <Text style={[st.modalTitle, { color: C.text1 }]}>

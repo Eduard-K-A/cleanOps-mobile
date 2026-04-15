@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { getCustomerJobs, updateJobStatus, approveJobCompletion } from '@/app/actions/jobs';
-import { useColors } from '@/lib/themeContext';
+import { useTheme } from '@/lib/themeContext';
 import { JobCard } from '@/components/shared/JobCard';
 import type { Job, JobStatus } from '@/types';
 
@@ -26,7 +26,7 @@ const FILTERS: { value: FilterVal; label: string }[] = [
 
 export default function CustomerRequestsScreen() {
   const router = useRouter();
-  const C = useColors();
+  const { colors: C, statusColors: S } = useTheme();
   const insets = useSafeAreaInsets();
   const [jobs,       setJobs]       = useState<Job[]>([]);
   const [loading,    setLoading]    = useState(true);
@@ -89,9 +89,16 @@ export default function CustomerRequestsScreen() {
   return (
     <SafeAreaView style={[st.safe, { backgroundColor: C.bg }]} edges={['top', 'left', 'right']}>
       {/* Header */}
-      <View style={st.header}>
-        <Text style={[st.title, { color: C.text1 }]}>My Requests</Text>
-        <Text style={[st.sub, { color: C.text3 }]}>Track and manage all your cleaning service jobs</Text>
+      <View style={[st.header, { backgroundColor: C.surface, borderBottomColor: C.divider }]}>
+        <View style={st.headerRow}>
+          <TouchableOpacity style={[st.backBtn, { backgroundColor: C.surface2 }]} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={20} color={C.text2} />
+          </TouchableOpacity>
+          <View style={st.headerText}>
+            <Text style={[st.title, { color: C.text1 }]}>My Requests</Text>
+            <Text style={[st.sub, { color: C.text3 }]}>Track and manage all your cleaning service jobs</Text>
+          </View>
+        </View>
       </View>
 
       {/* Search */}
@@ -175,11 +182,11 @@ export default function CustomerRequestsScreen() {
               />
               {item.status === 'OPEN' && (
                 <TouchableOpacity
-                  style={[st.cancelBtn, cancelling === item.id && st.disabled]}
+                  style={[st.cancelBtn, { backgroundColor: S.CANCELLED.bg, borderColor: S.CANCELLED.text + '40' }, cancelling === item.id && st.disabled]}
                   onPress={() => handleCancel(item.id)}
                   disabled={cancelling === item.id}
                 >
-                  <Text style={st.cancelBtnText}>
+                  <Text style={[st.cancelBtnText, { color: S.CANCELLED.text }]}>
                     {cancelling === item.id ? 'Cancelling…' : 'Cancel Request'}
                   </Text>
                 </TouchableOpacity>
@@ -194,14 +201,17 @@ export default function CustomerRequestsScreen() {
 
 const st = StyleSheet.create({
   safe:     { flex: 1 },
-  header:   { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
-  title:    { fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
-  sub:      { fontSize: 13, marginTop: 2 },
+  header:     { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, borderBottomWidth: 1 },
+  headerRow:  { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  backBtn:    { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  headerText: { flex: 1 },
+  title:      { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
+  sub:        { fontSize: 12, marginTop: 2 },
 
   searchBar: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     borderRadius: 12, borderWidth: 1,
-    paddingHorizontal: 14, marginHorizontal: 16, marginBottom: 10, height: 44,
+    paddingHorizontal: 14, marginHorizontal: 16, marginTop: 12, marginBottom: 10, height: 44,
   },
   searchInput: { flex: 1, fontSize: 14 },
 
@@ -226,9 +236,9 @@ const st = StyleSheet.create({
 
   cancelBtn: {
     marginTop: -8, marginBottom: 12, paddingVertical: 10,
-    alignItems: 'center', borderWidth: 1, borderColor: '#EF4444',
-    borderRadius: 10, backgroundColor: '#FEF2F2',
+    alignItems: 'center', borderWidth: 1,
+    borderRadius: 10,
   },
-  cancelBtnText: { fontSize: 13, fontWeight: '700', color: '#EF4444' },
+  cancelBtnText: { fontSize: 13, fontWeight: '700' },
   disabled: { opacity: 0.5 },
 });

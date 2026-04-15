@@ -5,7 +5,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/lib/authContext';
-import { useColors } from '@/lib/themeContext';
+import { useTheme } from '@/lib/themeContext';
 import { getEmployeeJobs } from '@/app/actions/jobs';
 import { signOut } from '@/app/actions/auth';
 import { StatCard } from '@/components/shared/StatCard';
@@ -17,7 +17,7 @@ const { width } = Dimensions.get('window');
 export default function EmployeeDashboardScreen() {
   const { profile } = useAuth();
   const router = useRouter();
-  const C = useColors();
+  const { colors: C, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const [jobs,       setJobs]       = useState<Job[]>([]);
   const [loading,    setLoading]    = useState(true);
@@ -76,12 +76,12 @@ export default function EmployeeDashboardScreen() {
           <StatCard label="Done"    value={completedJobs.length} icon="checkmark-circle-outline" color={C.success} />
         </View>
 
-        <View style={[st.earningsCard, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
+        <View style={[st.earningsCard, { backgroundColor: isDark ? '#064e3b' : '#ECFDF5', borderColor: isDark ? '#065f46' : '#A7F3D0' }]}>
           <View style={st.earningsLeft}>
             <Ionicons name="cash-outline" size={22} color={C.success} />
             <View>
-              <Text style={[st.earningsLabel, { color: '#065F46' }]}>Total Earnings</Text>
-              <Text style={[st.earningsValue, { color: '#047857' }]}>${(totalEarnings / 100).toFixed(2)}</Text>
+              <Text style={[st.earningsLabel, { color: isDark ? '#34d399' : '#065F46' }]}>Total Earnings</Text>
+              <Text style={[st.earningsValue, { color: isDark ? '#6ee7b7' : '#047857' }]}>${(totalEarnings / 100).toFixed(2)}</Text>
             </View>
           </View>
           <Ionicons name="trending-up-outline" size={28} color={C.success} style={{ opacity: 0.4 }} />
@@ -91,8 +91,8 @@ export default function EmployeeDashboardScreen() {
           <Text style={[st.sectionTitle, { color: C.text1 }]}>Quick Actions</Text>
           {[
             { label: 'Browse Available Jobs', icon: 'search-outline'     as const, href: '/employee/feed',    bg: C.blue50,  ic: C.blue600 },
-            { label: 'My Jobs (In Progress)', icon: 'briefcase-outline'  as const, href: '/employee/myjobs',  bg: '#FFFBEB', ic: C.warning },
-            { label: 'Job History',           icon: 'time-outline'       as const, href: '/employee/history', bg: '#ECFDF5', ic: C.success },
+            { label: 'My Jobs (In Progress)', icon: 'briefcase-outline'  as const, href: '/employee/myjobs',  bg: isDark ? '#3b2a0a' : '#FFFBEB', ic: C.warning },
+            { label: 'Job History',           icon: 'time-outline'       as const, href: '/employee/history', bg: isDark ? '#064e3b' : '#ECFDF5', ic: C.success },
           ].map((a) => (
             <TouchableOpacity
               key={a.label}

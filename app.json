@@ -15,7 +15,8 @@
       "adaptiveIcon": {
         "backgroundColor": "#1565C0"
       },
-      "package": "com.cleanops.mobile"
+      "package": "com.cleanops.mobile",
+      "softwareKeyboardLayoutMode": "pan"
     },
     "ios": {
       "supportsTablet": false,

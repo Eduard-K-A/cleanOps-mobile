@@ -108,14 +108,14 @@ export default function EmployeeJobDetailScreen() {
         <ChatWindow jobId={id} />
       ) : (
         <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
-          <View style={[st.heroCard, { backgroundColor: C.blue800 }]}>
+          <View style={[st.heroCard, { backgroundColor: C.blue700 }]}>
             <View style={st.heroTop}>
               <Text style={st.jobId}>#{job.id.slice(0, 8).toUpperCase()}</Text>
               <StatusBadge status={job.status} />
             </View>
             <Text style={st.price}>${(job.price_amount / 100).toFixed(2)}</Text>
             <Text style={st.priceNote}>You receive ~85% after platform fee</Text>
-            <View style={st.payoutPill}>
+            <View style={[st.payoutPill, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
               <Ionicons name="cash-outline" size={14} color="#fff" />
               <Text style={st.payoutText}>Est. payout: ${((job.price_amount * 0.85) / 100).toFixed(2)}</Text>
             </View>
@@ -124,6 +124,8 @@ export default function EmployeeJobDetailScreen() {
           <View style={[st.card, { backgroundColor: C.surface, borderColor: C.divider }]}>
             <Text style={[st.cardTitle, { color: C.text1 }]}>Job Info</Text>
             {[
+              { icon: 'person-outline'   as const, label: 'Customer', value: job.customer_name || '—' },
+              { icon: 'call-outline'     as const, label: 'Customer Phone', value: job.customer_phone || '—' },
               { icon: 'resize-outline'   as const, label: 'Size',     value: job.size || '—' },
               { icon: 'location-outline' as const, label: 'Location', value: job.location_address || '—' },
               { icon: 'flash-outline'    as const, label: 'Urgency',  value: job.urgency },
@@ -150,6 +152,17 @@ export default function EmployeeJobDetailScreen() {
                   </View>
                 ))}
               </View>
+            </View>
+          )}
+
+          {/* Custom Instructions */}
+          {job.custom_instructions && (
+            <View style={[st.card, { backgroundColor: C.surface, borderColor: C.divider }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="create-outline" size={18} color={C.blue600} />
+                <Text style={[st.cardTitle, { color: C.text1 }]}>Special Instructions</Text>
+              </View>
+              <Text style={{ fontSize: 14, color: C.text1, lineHeight: 20 }}>{job.custom_instructions}</Text>
             </View>
           )}
 

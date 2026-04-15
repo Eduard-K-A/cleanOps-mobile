@@ -47,8 +47,11 @@ export default function EmployeeFeedScreen() {
 
   return (
     <SafeAreaView style={[st.safe, { backgroundColor: C.bg }]} edges={['top', 'left', 'right']}>
-      <View style={st.header}>
-        <View>
+      <View style={[st.header, { backgroundColor: C.surface, borderBottomColor: C.divider }]}>
+        <TouchableOpacity style={[st.backBtn, { backgroundColor: C.surface2 }]} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={20} color={C.text2} />
+        </TouchableOpacity>
+        <View style={st.headerText}>
           <Text style={[st.title, { color: C.text1 }]}>Available Jobs</Text>
           <Text style={[st.sub, { color: C.text3 }]}>Browse and claim open cleaning jobs</Text>
         </View>
@@ -103,14 +106,13 @@ export default function EmployeeFeedScreen() {
 
 const st = StyleSheet.create({
   safe: { flex: 1 },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8,
-  },
-  title:      { fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
-  sub:        { fontSize: 13, marginTop: 2 },
-  refreshBtn: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  liveBadge:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingBottom: 10 },
+  header:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
+  backBtn:    { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  headerText: { flex: 1 },
+  title:      { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
+  sub:        { fontSize: 12, marginTop: 2 },
+  refreshBtn: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  liveBadge:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10 },
   liveDot:    { width: 7, height: 7, borderRadius: 4 },
   liveText:   { fontSize: 13, fontWeight: '500' },
   center:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },

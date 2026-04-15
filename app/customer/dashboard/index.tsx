@@ -87,7 +87,7 @@ export default function CustomerDashboardScreen() {
           ].map((a) => (
             <TouchableOpacity
               key={a.label}
-              style={[st.secondaryAction, { backgroundColor: C.blue50, borderColor: C.blue200 }]}
+              style={[st.secondaryAction, { backgroundColor: C.blue50, borderColor: C.blue100 }]}
               onPress={() => router.push(a.href as any)}
               activeOpacity={0.85}
             >

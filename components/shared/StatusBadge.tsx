@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { STATUS_COLORS } from '@/constants/colors';
+import { useStatusColors } from '@/lib/themeContext';
 import type { JobStatus } from '@/types';
 
 interface Props {
@@ -8,7 +8,8 @@ interface Props {
 }
 
 export function StatusBadge({ status }: Props) {
-  const s = STATUS_COLORS[status] ?? STATUS_COLORS['OPEN'];
+  const statusColors = useStatusColors();
+  const s = statusColors[status] ?? statusColors['OPEN'];
   return (
     <View style={[styles.badge, { backgroundColor: s.bg }]}>
       <View style={[styles.dot, { backgroundColor: s.text }]} />

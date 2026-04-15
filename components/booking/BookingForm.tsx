@@ -1,16 +1,18 @@
 // Mobile equivalent of components/booking/BookingForm.tsx
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, StyleSheet, TouchableOpacity,
   TextInput, ActivityIndicator, Alert, Dimensions,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '@/constants/colors';
+import { useTheme } from '@/lib/themeContext';
 import { createJob } from '@/app/actions/jobs';
 import { getBalance } from '@/app/actions/payments';
 import { SIZES, TASKS, URGENCIES, computePrice } from '@/stores/bookingStore';
 import type { JobUrgency } from '@/types';
+import { KeyboardView } from '@/components/shared/KeyboardView';
 
 type Step = 'size' | 'location' | 'urgency' | 'payment';
 
@@ -25,26 +27,27 @@ const { width } = Dimensions.get('window');
 
 // ── Step indicator ────────────────────────────────────────────────────────────
 function Stepper({ current }: { current: Step }) {
+  const { colors: C } = useTheme();
   const idx = STEPS.findIndex((s) => s.id === current);
   return (
-    <View style={st.stepper}>
+    <View style={[st.stepper, { backgroundColor: C.surface, borderBottomColor: C.divider }]}>
       {STEPS.map((step, i) => {
         const done   = i < idx;
         const active = i === idx;
         return (
           <React.Fragment key={step.id}>
             <View style={st.stepItem}>
-              <View style={[st.stepDot, active && st.stepDotActive, done && st.stepDotDone]}>
+              <View style={[st.stepDot, { backgroundColor: C.surface2 }, active && { backgroundColor: C.blue600 }, done && { backgroundColor: C.success }]}>
                 {done
                   ? <Ionicons name="checkmark" size={12} color="#fff" />
-                  : <Ionicons name={step.icon} size={12} color={active ? '#fff' : Colors.text3} />}
+                  : <Ionicons name={step.icon} size={12} color={active ? '#fff' : C.text3} />}
               </View>
-              <Text style={[st.stepLabel, (active || done) && st.stepLabelActive]}>
+              <Text style={[st.stepLabel, { color: C.text3 }, (active || done) && { color: C.blue600, fontWeight: '700' }]}>
                 {step.label}
               </Text>
             </View>
             {i < STEPS.length - 1 && (
-              <View style={[st.stepLine, done && st.stepLineDone]} />
+              <View style={[st.stepLine, { backgroundColor: C.divider }, done && { backgroundColor: C.success }]} />
             )}
           </React.Fragment>
         );
@@ -59,24 +62,25 @@ function BookingSummary({
 }: {
   size: string; address: string; urgency: JobUrgency; tasks: string[]; price: number;
 }) {
+  const { colors: C } = useTheme();
   return (
     <View style={st.summary}>
-      <Text style={st.summaryTitle}>Booking Summary</Text>
+      <Text style={[st.summaryTitle, { color: C.text1 }]}>Booking Summary</Text>
       {[
         { label: 'Size',     value: size },
         { label: 'Location', value: address },
         { label: 'Urgency',  value: urgency },
         { label: 'Tasks',    value: tasks.join(', ') },
       ].map((row) => (
-        <View key={row.label} style={st.summaryRow}>
-          <Text style={st.summaryKey}>{row.label}</Text>
-          <Text style={st.summaryVal} numberOfLines={2}>{row.value}</Text>
+        <View key={row.label} style={[st.summaryRow, { backgroundColor: C.surface2 }]}>
+          <Text style={[st.summaryKey, { color: C.text3 }]}>{row.label}</Text>
+          <Text style={[st.summaryVal, { color: C.text1 }]} numberOfLines={2}>{row.value}</Text>
         </View>
       ))}
-      <View style={st.summaryTotal}>
-        <Text style={st.summaryTotalLabel}>Estimated Total</Text>
-        <Text style={st.summaryTotalValue}>${(price / 100).toFixed(2)}</Text>
-        <Text style={st.summaryTotalNote}>Held in escrow until completion</Text>
+      <View style={[st.summaryTotal, { backgroundColor: C.blue50, borderColor: C.blue100 }]}>
+        <Text style={[st.summaryTotalLabel, { color: C.blue700 }]}>Estimated Total</Text>
+        <Text style={[st.summaryTotalValue, { color: C.blue600 }]}>${(price / 100).toFixed(2)}</Text>
+        <Text style={[st.summaryTotalNote, { color: C.blue400 }]}>Held in escrow until completion</Text>
       </View>
     </View>
   );
@@ -85,12 +89,14 @@ function BookingSummary({
 // ── Main component ────────────────────────────────────────────────────────────
 export function BookingForm() {
   const router = useRouter();
+  const { colors: C, statusColors: S, isDark } = useTheme();
   const [step,     setStep]     = useState<Step>('size');
   const [size,     setSize]     = useState('');
   const [address,  setAddress]  = useState('');
   const [distance, setDistance] = useState('');
   const [urgency,  setUrgency]  = useState<JobUrgency>('NORMAL');
   const [tasks,    setTasks]    = useState<string[]>([]);
+  const [customInstructions, setCustomInstructions] = useState('');
   const [loading,  setLoading]  = useState(false);
 
   const stepIdx = STEPS.findIndex((s) => s.id === step);
@@ -153,6 +159,8 @@ export function BookingForm() {
       address: address.trim(),
       distance: parsedDist,
       price,
+      size,
+      customInstructions: customInstructions.trim(),
     });
     Alert.alert(
       'Order Placed! 🎉',
@@ -167,19 +175,55 @@ export function BookingForm() {
 }
 
   return (
-    <View style={st.container}>
+    <View style={[st.container, { backgroundColor: C.bg }]}>
       <Stepper current={step} />
 
-      <ScrollView
+      <KeyboardView
         contentContainerStyle={st.scroll}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
+stickyFooter={
+          <View style={[st.nav, { backgroundColor: C.surface, borderTopColor: C.divider, paddingBottom: 0 }]}>
+            {stepIdx > 0 ? (
+              <TouchableOpacity style={[st.backBtn, { backgroundColor: C.surface2 }]} onPress={goBack}>
+                <Ionicons name="arrow-back" size={16} color={C.text2} />
+                <Text style={[st.backBtnText, { color: C.text2 }]}>Back</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={{ flex: 1 }} />
+            )}
 
+            {step !== 'payment' ? (
+              <TouchableOpacity
+                style={[st.nextBtn, { backgroundColor: C.blue600 }, !canNext() && st.disabled]}
+                onPress={goNext}
+                disabled={!canNext()}
+                activeOpacity={0.85}
+              >
+                <Text style={st.nextBtnText}>Continue</Text>
+                <Ionicons name="arrow-forward" size={16} color="#fff" />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[st.nextBtn, { backgroundColor: C.success }, loading && st.disabled]}
+                onPress={handleSubmit}
+                disabled={loading}
+                activeOpacity={0.85}
+              >
+                {loading
+                  ? <ActivityIndicator color="#fff" />
+                  : <>
+                      <Ionicons name="checkmark" size={16} color="#fff" />
+                      <Text style={st.nextBtnText}>Create Job & Pay</Text>
+                    </>
+                }
+              </TouchableOpacity>
+            )}
+          </View>
+        }
+      >
         {/* ── STEP 1: SIZE ─────────────────────────────── */}
         {step === 'size' && (
-          <View style={st.stepCard}>
-            <View style={st.stepHeader}>
+          <View style={[st.stepCard, { backgroundColor: C.surface, borderColor: C.divider }]}>
+            <View style={[st.stepHeader, { backgroundColor: C.blue600 }]}>
               <Ionicons name="resize-outline" size={22} color="#fff" />
               <View>
                 <Text style={st.stepHeaderTitle}>Property Size</Text>
@@ -187,18 +231,18 @@ export function BookingForm() {
               </View>
             </View>
             <View style={st.stepBody}>
-              <Text style={st.fieldLabel}>SELECT YOUR PROPERTY SIZE</Text>
+              <Text style={[st.fieldLabel, { color: C.text2 }]}>SELECT YOUR PROPERTY SIZE</Text>
               {SIZES.map((s) => (
                 <TouchableOpacity
                   key={s}
-                  style={[st.optionCard, size === s && st.optionCardSelected]}
+                  style={[st.optionCard, { backgroundColor: C.surface, borderColor: C.divider }, size === s && { borderColor: C.blue600, backgroundColor: C.blue50 }]}
                   onPress={() => setSize(s)}
                   activeOpacity={0.8}
                 >
-                  <View style={[st.optionRadio, size === s && st.optionRadioSelected]}>
+                  <View style={[st.optionRadio, { borderColor: C.divider }, size === s && { backgroundColor: C.blue600, borderColor: C.blue600 }]}>
                     {size === s && <Ionicons name="checkmark" size={12} color="#fff" />}
                   </View>
-                  <Text style={[st.optionText, size === s && st.optionTextSelected]}>{s}</Text>
+                  <Text style={[st.optionText, { color: C.text2 }, size === s && { color: C.blue800 }]}>{s}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -207,8 +251,8 @@ export function BookingForm() {
 
         {/* ── STEP 2: LOCATION ─────────────────────────── */}
         {step === 'location' && (
-          <View style={st.stepCard}>
-            <View style={st.stepHeader}>
+          <View style={[st.stepCard, { backgroundColor: C.surface, borderColor: C.divider }]}>
+            <View style={[st.stepHeader, { backgroundColor: C.blue600 }]}>
               <Ionicons name="location-outline" size={22} color="#fff" />
               <View>
                 <Text style={st.stepHeaderTitle}>Job Location</Text>
@@ -216,36 +260,36 @@ export function BookingForm() {
               </View>
             </View>
             <View style={st.stepBody}>
-              <Text style={st.fieldLabel}>ADDRESS</Text>
-              <View style={st.inputWrap}>
-                <Ionicons name="location-outline" size={18} color={Colors.text3} />
+              <Text style={[st.fieldLabel, { color: C.text2 }]}>ADDRESS</Text>
+              <View style={[st.inputWrap, { backgroundColor: C.surface2, borderColor: C.divider }]}>
+                <Ionicons name="location-outline" size={18} color={C.text3} />
                 <TextInput
-                  style={st.input}
+                  style={[st.input, { color: C.text1 }]}
                   placeholder="123 Main St, City, ZIP"
-                  placeholderTextColor={Colors.text3}
+                  placeholderTextColor={C.text3}
                   value={address}
                   onChangeText={setAddress}
                   multiline
                 />
               </View>
-              <Text style={st.hint}>Format: "Street Address, City, ZIP"</Text>
+              <Text style={[st.hint, { color: C.text3 }]}>Format: "Street Address, City, ZIP"</Text>
 
-              <Text style={[st.fieldLabel, { marginTop: 16 }]}>DISTANCE FROM CITY HALL (KM)</Text>
-              <View style={st.inputWrap}>
-                <Ionicons name="navigate-outline" size={18} color={Colors.text3} />
+              <Text style={[st.fieldLabel, { marginTop: 16, color: C.text2 }]}>DISTANCE FROM CITY HALL (KM)</Text>
+              <View style={[st.inputWrap, { backgroundColor: C.surface2, borderColor: C.divider }]}>
+                <Ionicons name="navigate-outline" size={18} color={C.text3} />
                 <TextInput
-                  style={st.input}
+                  style={[st.input, { color: C.text1 }]}
                   placeholder="e.g. 5.5"
-                  placeholderTextColor={Colors.text3}
+                  placeholderTextColor={C.text3}
                   value={distance}
                   onChangeText={setDistance}
                   keyboardType="decimal-pad"
                 />
               </View>
 
-              <View style={st.infoBox}>
-                <Ionicons name="information-circle-outline" size={16} color={Colors.blue600} />
-                <Text style={st.infoText}>Example: "123 Main St, New York, 10001"</Text>
+              <View style={[st.infoBox, { backgroundColor: C.blue50, borderColor: C.blue100 }]}>
+                <Ionicons name="information-circle-outline" size={16} color={C.blue600} />
+                <Text style={[st.infoText, { color: C.blue800 }]}>Example: "123 Main St, New York, 10001"</Text>
               </View>
             </View>
           </View>
@@ -253,8 +297,8 @@ export function BookingForm() {
 
         {/* ── STEP 3: URGENCY & TASKS ───────────────────── */}
         {step === 'urgency' && (
-          <View style={st.stepCard}>
-            <View style={st.stepHeader}>
+          <View style={[st.stepCard, { backgroundColor: C.surface, borderColor: C.divider }]}>
+            <View style={[st.stepHeader, { backgroundColor: C.blue600 }]}>
               <Ionicons name="flash-outline" size={22} color="#fff" />
               <View>
                 <Text style={st.stepHeaderTitle}>Urgency & Tasks</Text>
@@ -262,24 +306,24 @@ export function BookingForm() {
               </View>
             </View>
             <View style={st.stepBody}>
-              <Text style={st.fieldLabel}>URGENCY LEVEL</Text>
+              <Text style={[st.fieldLabel, { color: C.text2 }]}>URGENCY LEVEL</Text>
               <View style={st.urgencyRow}>
                 {URGENCIES.map((u) => (
                   <TouchableOpacity
                     key={u.value}
-                    style={[st.urgencyBtn, urgency === u.value && st.urgencyBtnSelected]}
+                    style={[st.urgencyBtn, { backgroundColor: C.surface, borderColor: C.divider }, urgency === u.value && { borderColor: C.blue600, backgroundColor: C.blue50 }]}
                     onPress={() => setUrgency(u.value)}
                     activeOpacity={0.8}
                   >
-                    <Text style={[st.urgencyLabel, urgency === u.value && st.urgencyLabelSelected]}>
+                    <Text style={[st.urgencyLabel, { color: C.text2 }, urgency === u.value && { color: C.blue800 }]}>
                       {u.label}
                     </Text>
-                    <Text style={st.urgencyDesc}>{u.desc}</Text>
+                    <Text style={[st.urgencyDesc, { color: C.text3 }]}>{u.desc}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <Text style={[st.fieldLabel, { marginTop: 20 }]}>
+              <Text style={[st.fieldLabel, { marginTop: 20, color: C.text2 }]}>
                 CLEANING TASKS
                 <Text style={st.taskCount}> · {tasks.length} selected</Text>
               </Text>
@@ -287,26 +331,39 @@ export function BookingForm() {
                 {TASKS.map((t) => (
                   <TouchableOpacity
                     key={t}
-                    style={[st.taskBtn, tasks.includes(t) && st.taskBtnSelected]}
+                    style={[st.taskBtn, { backgroundColor: C.surface, borderColor: C.divider }, tasks.includes(t) && { borderColor: C.blue600, backgroundColor: C.blue50 }]}
                     onPress={() => toggleTask(t)}
                     activeOpacity={0.8}
                   >
-                    <View style={[st.taskCheck, tasks.includes(t) && st.taskCheckSelected]}>
+                    <View style={[st.taskCheck, { borderColor: C.divider }, tasks.includes(t) && { backgroundColor: C.blue600, borderColor: C.blue600 }]}>
                       {tasks.includes(t) && <Ionicons name="checkmark" size={11} color="#fff" />}
                     </View>
-                    <Text style={[st.taskBtnText, tasks.includes(t) && st.taskBtnTextSelected]}>
+                    <Text style={[st.taskBtnText, { color: C.text2 }, tasks.includes(t) && { color: C.blue800 }]}>
                       {t}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
+              <Text style={[st.fieldLabel, { marginTop: 20, color: C.text2 }]}>CUSTOM INSTRUCTIONS (OPTIONAL)</Text>
+              <View style={[st.inputWrap, { backgroundColor: C.surface2, borderColor: C.divider }]}>
+                <Ionicons name="create-outline" size={18} color={C.text3} />
+                <TextInput
+                  style={[st.input, { color: C.text1 }]}
+                  placeholder="e.g. Please clean under the sofa..."
+                  placeholderTextColor={C.text3}
+                  value={customInstructions}
+                  onChangeText={setCustomInstructions}
+                  multiline
+                />
+              </View>
+
               {/* Live price preview */}
               {tasks.length > 0 && (
-                <View style={st.pricePreview}>
-                  <Text style={st.pricePreviewLabel}>Estimated Price</Text>
-                  <Text style={st.pricePreviewValue}>${(price / 100).toFixed(2)}</Text>
-                  <Text style={st.pricePreviewNote}>Held in escrow until job completion</Text>
+                <View style={[st.pricePreview, { backgroundColor: isDark ? '#064e3b' : '#ECFDF5', borderColor: isDark ? '#065f46' : '#A7F3D0' }]}>
+                  <Text style={[st.pricePreviewLabel, { color: isDark ? '#34d399' : '#065F46' }]}>Estimated Price</Text>
+                  <Text style={[st.pricePreviewValue, { color: isDark ? '#6ee7b7' : '#047857' }]}>${(price / 100).toFixed(2)}</Text>
+                  <Text style={[st.pricePreviewNote, { color: isDark ? '#34d399' : '#6EE7B7' }]}>Held in escrow until job completion</Text>
                 </View>
               )}
             </View>
@@ -316,8 +373,8 @@ export function BookingForm() {
         {/* ── STEP 4: CONFIRM & PAY ────────────────────── */}
         {step === 'payment' && (
           <View>
-            <View style={st.stepCard}>
-              <View style={[st.stepHeader, { backgroundColor: '#059669' }]}>
+            <View style={[st.stepCard, { backgroundColor: C.surface, borderColor: C.divider }]}>
+              <View style={[st.stepHeader, { backgroundColor: isDark ? '#065f46' : '#059669' }]}>
                 <Ionicons name="checkmark-circle-outline" size={22} color="#fff" />
                 <View>
                   <Text style={st.stepHeaderTitle}>Review & Authorize Payment</Text>
@@ -334,24 +391,24 @@ export function BookingForm() {
                 />
 
                 {/* Payment amount */}
-                <View style={st.paymentBox}>
-                  <Text style={st.paymentLabel}>PAYMENT AMOUNT</Text>
-                  <Text style={st.paymentValue}>${(price / 100).toFixed(2)}</Text>
+                <View style={[st.paymentBox, { backgroundColor: C.blue50, borderColor: C.blue100 }]}>
+                  <Text style={[st.paymentLabel, { color: C.blue800 }]}>PAYMENT AMOUNT</Text>
+                  <Text style={[st.paymentValue, { color: C.blue600 }]}>${(price / 100).toFixed(2)}</Text>
                   {[
                     'Secure escrow: Funds held until job completion',
                     'Full protection: You control payment release',
                     'No surprises: Price confirmed, no hidden fees',
                   ].map((line) => (
                     <View key={line} style={st.paymentCheckRow}>
-                      <Ionicons name="checkmark-circle" size={16} color={Colors.blue600} />
-                      <Text style={st.paymentCheckText}>{line}</Text>
+                      <Ionicons name="checkmark-circle" size={16} color={C.blue600} />
+                      <Text style={[st.paymentCheckText, { color: C.blue800 }]}>{line}</Text>
                     </View>
                   ))}
                 </View>
 
-                <View style={st.warningBox}>
-                  <Ionicons name="alert-circle-outline" size={18} color="#92400E" />
-                  <Text style={st.warningText}>
+                <View style={[st.warningBox, { backgroundColor: isDark ? '#3b2a0a' : '#FFFBEB', borderColor: isDark ? '#fbbf24' : '#FDE68A' }]}>
+                  <Ionicons name="alert-circle-outline" size={18} color={isDark ? '#fbbf24' : '#92400E'} />
+                  <Text style={[st.warningText, { color: isDark ? '#fef3c7' : '#92400E' }]}>
                     By proceeding, you authorize this payment. You'll control fund release after the cleaner completes the job.
                   </Text>
                 </View>
@@ -359,53 +416,13 @@ export function BookingForm() {
             </View>
           </View>
         )}
-
-      </ScrollView>
-
-      {/* ── Navigation buttons ─────────────────────────── */}
-      <View style={st.nav}>
-        {stepIdx > 0 ? (
-          <TouchableOpacity style={st.backBtn} onPress={goBack}>
-            <Ionicons name="arrow-back" size={16} color={Colors.text2} />
-            <Text style={st.backBtnText}>Back</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={{ flex: 1 }} />
-        )}
-
-        {step !== 'payment' ? (
-          <TouchableOpacity
-            style={[st.nextBtn, !canNext() && st.disabled]}
-            onPress={goNext}
-            disabled={!canNext()}
-            activeOpacity={0.85}
-          >
-            <Text style={st.nextBtnText}>Continue</Text>
-            <Ionicons name="arrow-forward" size={16} color="#fff" />
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[st.nextBtn, { backgroundColor: '#059669' }, loading && st.disabled]}
-            onPress={handleSubmit}
-            disabled={loading}
-            activeOpacity={0.85}
-          >
-            {loading
-              ? <ActivityIndicator color="#fff" />
-              : <>
-                  <Ionicons name="checkmark" size={16} color="#fff" />
-                  <Text style={st.nextBtnText}>Create Job & Pay</Text>
-                </>
-            }
-          </TouchableOpacity>
-        )}
-      </View>
+      </KeyboardView>
     </View>
   );
 }
 
 const st = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
+  container: { flex: 1 },
 
   // Stepper
   stepper: {
@@ -413,32 +430,27 @@ const st = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 14,
-    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
   },
   stepItem:       { alignItems: 'center', gap: 4 },
   stepDot: {
     width: 26, height: 26, borderRadius: 13,
-    backgroundColor: Colors.surface2,
     alignItems: 'center', justifyContent: 'center',
   },
-  stepDotActive:  { backgroundColor: Colors.blue600 },
-  stepDotDone:    { backgroundColor: Colors.success },
-  stepLabel:      { fontSize: 9, color: Colors.text3, fontWeight: '600' },
-  stepLabelActive: { color: Colors.blue700 },
-  stepLine:       { flex: 1, height: 2, backgroundColor: Colors.divider, marginBottom: 14 },
-  stepLineDone:   { backgroundColor: Colors.success },
+  stepDotActive:  { },
+  stepDotDone:    { },
+  stepLabel:      { fontSize: 9 },
+  stepLabelActive: { },
+  stepLine:       { flex: 1, height: 2, marginBottom: 14 },
+  stepLineDone:   { },
 
   scroll: { padding: 16, paddingBottom: 24 },
 
   // Step card
   stepCard: {
-    backgroundColor: Colors.surface,
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.divider,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
@@ -446,7 +458,6 @@ const st = StyleSheet.create({
     elevation: 3,
   },
   stepHeader: {
-    backgroundColor: Colors.blue600,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -459,12 +470,11 @@ const st = StyleSheet.create({
   fieldLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: Colors.text2,
     letterSpacing: 0.8,
     textTransform: 'uppercase',
     marginBottom: 4,
   },
-  taskCount: { color: Colors.blue600, textTransform: 'none' },
+  taskCount: { textTransform: 'none' },
 
   // Options (size step)
   optionCard: {
@@ -474,60 +484,52 @@ const st = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: Colors.divider,
-    backgroundColor: Colors.surface,
   },
-  optionCardSelected: { borderColor: Colors.blue600, backgroundColor: Colors.blue50 },
+  optionCardSelected: { },
   optionRadio: {
     width: 20, height: 20, borderRadius: 10,
-    borderWidth: 2, borderColor: Colors.divider,
+    borderWidth: 2,
     alignItems: 'center', justifyContent: 'center',
   },
-  optionRadioSelected: { backgroundColor: Colors.blue600, borderColor: Colors.blue600 },
-  optionText:         { fontSize: 14, fontWeight: '600', color: Colors.text2 },
-  optionTextSelected: { color: Colors.blue800 },
+  optionRadioSelected: { },
+  optionText:         { fontSize: 14, fontWeight: '600' },
+  optionTextSelected: { },
 
   // Location
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    backgroundColor: Colors.surface2,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: Colors.divider,
     padding: 14,
   },
-  input: { flex: 1, fontSize: 14, color: Colors.text1, lineHeight: 20 },
-  hint:  { fontSize: 12, color: Colors.text3 },
+  input: { flex: 1, fontSize: 14, lineHeight: 20 },
+  hint:  { fontSize: 12 },
   infoBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: Colors.blue50,
     borderRadius: 10,
     padding: 12,
     borderWidth: 1,
-    borderColor: Colors.blue100,
   },
-  infoText: { fontSize: 12, color: Colors.blue800, flex: 1 },
+  infoText: { fontSize: 12, flex: 1 },
 
   // Urgency
   urgencyRow: { flexDirection: 'row', gap: 8 },
   urgencyBtn: {
     flex: 1,
-    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 12,
     borderWidth: 2,
-    borderColor: Colors.divider,
     alignItems: 'center',
     gap: 4,
   },
-  urgencyBtnSelected:    { borderColor: Colors.blue600, backgroundColor: Colors.blue50 },
-  urgencyLabel:          { fontSize: 13, fontWeight: '700', color: Colors.text2 },
-  urgencyLabelSelected:  { color: Colors.blue800 },
-  urgencyDesc:           { fontSize: 10, color: Colors.text3, textAlign: 'center' },
+  urgencyBtnSelected:    { },
+  urgencyLabel:          { fontSize: 13, fontWeight: '700' },
+  urgencyLabelSelected:  { },
+  urgencyDesc:           { fontSize: 10, textAlign: 'center' },
 
   // Tasks
   tasksGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -539,86 +541,75 @@ const st = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: Colors.divider,
-    backgroundColor: Colors.surface,
   },
-  taskBtnSelected:     { borderColor: Colors.blue600, backgroundColor: Colors.blue50 },
+  taskBtnSelected:     { },
   taskCheck: {
     width: 16, height: 16, borderRadius: 4,
-    borderWidth: 1.5, borderColor: Colors.divider,
+    borderWidth: 1.5,
     alignItems: 'center', justifyContent: 'center',
   },
-  taskCheckSelected:   { backgroundColor: Colors.blue600, borderColor: Colors.blue600 },
-  taskBtnText:         { fontSize: 13, fontWeight: '600', color: Colors.text2 },
-  taskBtnTextSelected: { color: Colors.blue800 },
+  taskCheckSelected:   { },
+  taskBtnText:         { fontSize: 13, fontWeight: '600' },
+  taskBtnTextSelected: { },
 
   // Price preview
   pricePreview: {
-    backgroundColor: '#ECFDF5',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#A7F3D0',
     alignItems: 'center',
     marginTop: 8,
   },
-  pricePreviewLabel: { fontSize: 11, fontWeight: '700', color: '#065F46', letterSpacing: 0.6, textTransform: 'uppercase' },
-  pricePreviewValue: { fontSize: 32, fontWeight: '800', color: '#047857', letterSpacing: -1, marginTop: 4 },
-  pricePreviewNote:  { fontSize: 11, color: '#6EE7B7', marginTop: 2 },
+  pricePreviewLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
+  pricePreviewValue: { fontSize: 32, fontWeight: '800', letterSpacing: -1, marginTop: 4 },
+  pricePreviewNote:  { fontSize: 11, marginTop: 2 },
 
   // Summary
   summary: { gap: 10 },
-  summaryTitle:      { fontSize: 15, fontWeight: '800', color: Colors.text1, marginBottom: 4 },
+  summaryTitle:      { fontSize: 15, fontWeight: '800', marginBottom: 4 },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: Colors.surface2,
     borderRadius: 10,
     padding: 12,
     gap: 12,
   },
-  summaryKey:  { fontSize: 11, color: Colors.text3, fontWeight: '600', textTransform: 'uppercase' },
-  summaryVal:  { fontSize: 13, color: Colors.text1, fontWeight: '600', flex: 1, textAlign: 'right' },
+  summaryKey:  { fontSize: 11, fontWeight: '600', textTransform: 'uppercase' },
+  summaryVal:  { fontSize: 13, fontWeight: '600', flex: 1, textAlign: 'right' },
   summaryTotal: {
-    backgroundColor: Colors.blue50,
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: Colors.blue100,
     alignItems: 'center',
     marginTop: 6,
   },
-  summaryTotalLabel: { fontSize: 11, fontWeight: '700', color: Colors.blue700, letterSpacing: 0.5, textTransform: 'uppercase' },
-  summaryTotalValue: { fontSize: 30, fontWeight: '900', color: Colors.blue600, letterSpacing: -1, marginTop: 4 },
-  summaryTotalNote:  { fontSize: 11, color: Colors.blue400, marginTop: 2 },
+  summaryTotalLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
+  summaryTotalValue: { fontSize: 30, fontWeight: '900', letterSpacing: -1, marginTop: 4 },
+  summaryTotalNote:  { fontSize: 11, marginTop: 2 },
 
   // Payment
   paymentBox: {
-    backgroundColor: Colors.blue50,
     borderRadius: 14,
     borderWidth: 2,
-    borderColor: Colors.blue100,
     padding: 18,
     gap: 10,
     marginTop: 14,
   },
-  paymentLabel: { fontSize: 10, fontWeight: '700', color: Colors.blue800, letterSpacing: 1, textTransform: 'uppercase' },
-  paymentValue: { fontSize: 36, fontWeight: '900', color: Colors.blue600, letterSpacing: -1 },
+  paymentLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
+  paymentValue: { fontSize: 36, fontWeight: '900', letterSpacing: -1 },
   paymentCheckRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  paymentCheckText: { fontSize: 13, color: Colors.blue800, flex: 1, lineHeight: 18 },
+  paymentCheckText: { fontSize: 13, flex: 1, lineHeight: 18 },
 
   warningBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    backgroundColor: '#FFFBEB',
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#FDE68A',
     marginTop: 12,
   },
-  warningText: { fontSize: 13, color: '#92400E', flex: 1, lineHeight: 18 },
+  warningText: { fontSize: 13, flex: 1, lineHeight: 18 },
 
   // Nav buttons
   nav: {
@@ -626,9 +617,7 @@ const st = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: Colors.surface,
     borderTopWidth: 1,
-    borderTopColor: Colors.divider,
   },
   backBtn: {
     flex: 1,
@@ -636,18 +625,16 @@ const st = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: Colors.surface2,
     borderRadius: 12,
     paddingVertical: 14,
   },
-  backBtnText: { fontSize: 14, fontWeight: '700', color: Colors.text2 },
+  backBtnText: { fontSize: 14, fontWeight: '700' },
   nextBtn: {
     flex: 2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: Colors.blue600,
     borderRadius: 12,
     paddingVertical: 14,
   },

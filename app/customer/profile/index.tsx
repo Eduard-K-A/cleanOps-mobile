@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  Alert, ActivityIndicator, ScrollView,
+  Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,13 +19,22 @@ export default function CustomerProfileScreen() {
   const insets = useSafeAreaInsets();
 
   const [name,    setName]    = useState(profile?.full_name ?? '');
+  const [phone,   setPhone]   = useState(profile?.phone ?? '');
   const [saving,  setSaving]  = useState(false);
 
   async function handleSave() {
     if (!name.trim()) { Alert.alert('Required', 'Name cannot be empty.'); return; }
+    
+    // Philippines Phone Validation: 09XXXXXXXXX or +639XXXXXXXXX
+    const phPhoneRegex = /^(09|\+639)\d{9}$/;
+    if (phone && !phPhoneRegex.test(phone.replace(/\s/g, ''))) {
+      Alert.alert('Invalid Phone', 'Please enter a valid PH mobile number (e.g., 09123456789 or +639123456789).');
+      return;
+    }
+
     setSaving(true);
     try {
-      await updateProfile(name);
+      await updateProfile(name, phone);
       await refreshProfile();
       Alert.alert('Saved', 'Profile updated successfully.');
     } catch (err: any) { Alert.alert('Error', err.message); }
@@ -48,67 +57,87 @@ export default function CustomerProfileScreen() {
         <View style={{ width: 38 }} />
       </View>
 
-      <ScrollView contentContainerStyle={[st.scroll, { paddingBottom: insets.bottom + 24 }]} showsVerticalScrollIndicator={false}>
-        {/* Avatar */}
-        <View style={[st.avatarWrap, { backgroundColor: C.blue600 }]}>
-          <Text style={st.avatarText}>{(profile?.full_name ?? 'U')[0].toUpperCase()}</Text>
-        </View>
-        <Text style={[st.roleBadge, { color: C.text3 }]}>Customer Account</Text>
-
-        {/* Stats */}
-        <View style={[st.card, { backgroundColor: C.surface, borderColor: C.divider }]}>
-          <Text style={[st.cardTitle, { color: C.text1 }]}>Account Info</Text>
-          {[
-            { label: 'Balance', value: `$${Number(profile?.money_balance ?? 0).toFixed(2)}` },
-          ].map((row) => (
-            <View key={row.label} style={[st.infoRow, { borderTopColor: C.divider }]}>
-              <Text style={[st.infoLabel, { color: C.text3 }]}>{row.label}</Text>
-              <Text style={[st.infoValue, { color: C.text1 }]}>{row.value}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Edit name */}
-        <View style={[st.card, { backgroundColor: C.surface, borderColor: C.divider }]}>
-          <Text style={[st.cardTitle, { color: C.text1 }]}>Edit Profile</Text>
-          <Text style={[st.fieldLabel, { color: C.text2 }]}>FULL NAME</Text>
-          <View style={[st.inputRow, { backgroundColor: C.surface2, borderColor: C.divider }]}>
-            <TextInput
-              style={[st.input, { color: C.text1 }]}
-              placeholder="Your full name"
-              placeholderTextColor={C.text3}
-              value={name}
-              onChangeText={setName}
-              autoCapitalize="words"
-            />
-            <Ionicons name="person-outline" size={18} color={C.text3} />
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior="padding"
+      >
+        <ScrollView contentContainerStyle={[st.scroll, { paddingBottom: insets.bottom + 24 }]} showsVerticalScrollIndicator={false}>
+          {/* Avatar */}
+          <View style={[st.avatarWrap, { backgroundColor: C.blue600 }]}>
+            <Text style={st.avatarText}>{(profile?.full_name ?? 'U')[0].toUpperCase()}</Text>
           </View>
-          <TouchableOpacity
-            style={[st.saveBtn, { backgroundColor: C.blue600 }, saving && st.disabled]}
-            onPress={handleSave}
-            disabled={saving}
-          >
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={st.saveBtnText}>Save Changes</Text>}
-          </TouchableOpacity>
-        </View>
+          <Text style={[st.roleBadge, { color: C.text3 }]}>Customer Account</Text>
 
-        {/* Dark mode */}
-        <View style={[st.card, { backgroundColor: C.surface, borderColor: C.divider }]}>
-          <Text style={[st.cardTitle, { color: C.text1 }]}>Appearance</Text>
-          <View style={st.themeRow}>
-            {themeOptions.map((opt) => (
-              <TouchableOpacity
-                key={opt.value}
-                style={[st.themeBtn, { borderColor: colorMode === opt.value ? C.blue600 : C.divider, backgroundColor: colorMode === opt.value ? C.blue50 : C.surface2 }]}
-                onPress={() => setColorMode(opt.value)}
-              >
-                <Ionicons name={opt.icon} size={20} color={colorMode === opt.value ? C.blue600 : C.text3} />
-                <Text style={[st.themeBtnText, { color: colorMode === opt.value ? C.blue600 : C.text3 }]}>{opt.label}</Text>
-              </TouchableOpacity>
+          {/* Stats */}
+          <View style={[st.card, { backgroundColor: C.surface, borderColor: C.divider }]}>
+            <Text style={[st.cardTitle, { color: C.text1 }]}>Account Info</Text>
+            {[
+              { label: 'Balance', value: `$${Number(profile?.money_balance ?? 0).toFixed(2)}` },
+            ].map((row) => (
+              <View key={row.label} style={[st.infoRow, { borderTopColor: C.divider }]}>
+                <Text style={[st.infoLabel, { color: C.text3 }]}>{row.label}</Text>
+                <Text style={[st.infoValue, { color: C.text1 }]}>{row.value}</Text>
+              </View>
             ))}
           </View>
-        </View>
-      </ScrollView>
+
+          {/* Edit name */}
+          <View style={[st.card, { backgroundColor: C.surface, borderColor: C.divider }]}>
+            <Text style={[st.cardTitle, { color: C.text1 }]}>Edit Profile</Text>
+            
+            <Text style={[st.fieldLabel, { color: C.text2 }]}>FULL NAME</Text>
+            <View style={[st.inputRow, { backgroundColor: C.surface2, borderColor: C.divider, marginBottom: 12 }]}>
+              <TextInput
+                style={[st.input, { color: C.text1 }]}
+                placeholder="Your full name"
+                placeholderTextColor={C.text3}
+                value={name}
+                onChangeText={setName}
+                autoCapitalize="words"
+              />
+              <Ionicons name="person-outline" size={18} color={C.text3} />
+            </View>
+
+            <Text style={[st.fieldLabel, { color: C.text2 }]}>PHONE NUMBER</Text>
+            <View style={[st.inputRow, { backgroundColor: C.surface2, borderColor: C.divider }]}>
+              <TextInput
+                style={[st.input, { color: C.text1 }]}
+                placeholder="0912 345 6789"
+                placeholderTextColor={C.text3}
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+              />
+              <Ionicons name="call-outline" size={18} color={C.text3} />
+            </View>
+
+            <TouchableOpacity
+              style={[st.saveBtn, { backgroundColor: C.blue600 }, saving && st.disabled]}
+              onPress={handleSave}
+              disabled={saving}
+            >
+              {saving ? <ActivityIndicator color="#fff" /> : <Text style={st.saveBtnText}>Save Changes</Text>}
+            </TouchableOpacity>
+          </View>
+
+          {/* Dark mode */}
+          <View style={[st.card, { backgroundColor: C.surface, borderColor: C.divider }]}>
+            <Text style={[st.cardTitle, { color: C.text1 }]}>Appearance</Text>
+            <View style={st.themeRow}>
+              {themeOptions.map((opt) => (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[st.themeBtn, { borderColor: colorMode === opt.value ? C.blue600 : C.divider, backgroundColor: colorMode === opt.value ? C.blue50 : C.surface2 }]}
+                  onPress={() => setColorMode(opt.value)}
+                >
+                  <Ionicons name={opt.icon} size={20} color={colorMode === opt.value ? C.blue600 : C.text3} />
+                  <Text style={[st.themeBtnText, { color: colorMode === opt.value ? C.blue600 : C.text3 }]}>{opt.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
