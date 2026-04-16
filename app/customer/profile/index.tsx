@@ -8,6 +8,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/lib/authContext';
 import { useColors, useTheme } from '@/lib/themeContext';
+import { useToast } from '@/lib/toastContext';
 import { updateProfile } from '@/app/actions/profile';
 import { getBalance } from '@/app/actions/payments';
 
@@ -16,6 +17,7 @@ export default function CustomerProfileScreen() {
   const { profile, refreshProfile } = useAuth();
   const C = useColors();
   const { isDark, colorMode, setColorMode } = useTheme();
+  const toast = useToast();
   const insets = useSafeAreaInsets();
 
   const [name,    setName]    = useState(profile?.full_name ?? '');
@@ -36,7 +38,7 @@ export default function CustomerProfileScreen() {
     try {
       await updateProfile(name, phone);
       await refreshProfile();
-      Alert.alert('Saved', 'Profile updated successfully.');
+      toast.show('Profile updated successfully.');
     } catch (err: any) { Alert.alert('Error', err.message); }
     finally { setSaving(false); }
   }

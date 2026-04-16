@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  ActivityIndicator, Alert, KeyboardAvoidingView,
+  ActivityIndicator, KeyboardAvoidingView,
   Platform, ScrollView, Dimensions,
 } from 'react-native';
 import { useRouter, Link } from 'expo-router';
@@ -13,7 +13,6 @@ import { signUp } from '@/app/actions/auth';
 import { useColors } from '@/lib/themeContext';
 
 const { width } = Dimensions.get('window');
-
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 type Role = 'customer' | 'employee';
@@ -21,6 +20,7 @@ type Role = 'customer' | 'employee';
 export default function SignupScreen() {
   const router = useRouter();
   const C = useColors();
+
   const [fullName,     setFullName]     = useState('');
   const [email,        setEmail]        = useState('');
   const [password,     setPassword]     = useState('');
@@ -28,34 +28,41 @@ export default function SignupScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading,      setLoading]      = useState(false);
 
+  const [errors, setErrors] = useState<{ name: string; email: string; password: string }>({ name: '', email: '', password: '' });
+
   function passwordStrength(pw: string): { bars: number; label: string; color: string } {
-    if (!pw)        return { bars: 0, label: '',       color: '' };
-    if (pw.length < 6)  return { bars: 1, label: 'Weak',   color: C.error };
-    if (pw.length < 10) return { bars: 2, label: 'Fair',   color: C.warning };
-    return              { bars: 3, label: 'Strong', color: C.success };
+    if (!pw)           return { bars: 0, label: '',       color: '' };
+    if (pw.length < 6) return { bars: 1, label: 'Weak',   color: C.error };
+    if (pw.length < 10)return { bars: 2, label: 'Fair',   color: C.warning };
+    return               { bars: 3, label: 'Strong', color: C.success };
   }
 
   const pw = passwordStrength(password);
 
+  function validateFields(): boolean {
+    const e: typeof errors = { name: '', email: '', password: '' };
+    if (!fullName.trim())              e.name     = 'Full name is required.';
+    else if (fullName.trim().length < 2) e.name   = 'Name must be at least 2 characters.';
+    if (!email.trim())                 e.email    = 'Email is required.';
+    else if (!EMAIL_RE.test(email.trim())) e.email = 'Enter a valid email address.';
+    if (!password)                     e.password = 'Password is required.';
+    else if (password.length < 6)      e.password = 'Password must be at least 6 characters.';
+    setErrors(e);
+    return !e.name && !e.email && !e.password;
+  }
+
   async function handleSignup() {
-    if (!fullName.trim() || !email.trim() || !password) {
-      Alert.alert('Missing fields', 'Full name, email, and password are all required.');
-      return;
-    }
-    if (!EMAIL_RE.test(email.trim())) {
-      Alert.alert('Invalid email', 'Please enter a valid email address (e.g. you@example.com).');
-      return;
-    }
-    if (password.length < 6) {
-      Alert.alert('Password too short', 'Password must be at least 6 characters.');
-      return;
-    }
+    if (!validateFields()) return;
     setLoading(true);
     try {
       await signUp({ email, password, fullName, role });
-      // navigation handled by _layout.tsx auth listener
     } catch (err: any) {
-      Alert.alert('Sign up failed', err.message ?? 'Please try again.');
+      const msg: string = err.message ?? 'Sign up failed.';
+      if (msg.toLowerCase().includes('email')) {
+        setErrors((p) => ({ ...p, email: msg }));
+      } else {
+        setErrors((p) => ({ ...p, password: msg }));
+      }
     } finally {
       setLoading(false);
     }
@@ -63,21 +70,13 @@ export default function SignupScreen() {
 
   return (
     <SafeAreaView style={[st.safe, { backgroundColor: C.surface }]}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView
-          contentContainerStyle={st.scroll}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Back */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView contentContainerStyle={st.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+
           <TouchableOpacity style={[st.backBtn, { backgroundColor: C.surface2 }]} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={20} color={C.text2} />
           </TouchableOpacity>
 
-          {/* Brand */}
           <View style={st.brand}>
             <LinearGradient colors={['#1565C0', '#42A5F5']} style={st.brandIcon}>
               <Ionicons name="sparkles" size={18} color="#fff" />
@@ -85,7 +84,6 @@ export default function SignupScreen() {
             <Text style={[st.brandName, { color: C.text1 }]}>CleanOps</Text>
           </View>
 
-          {/* Header */}
           <Text style={[st.title, { color: C.text1 }]}>Create account</Text>
           <Text style={[st.sub, { color: C.text3 }]}>
             Already have one?{' '}
@@ -116,61 +114,58 @@ export default function SignupScreen() {
             </View>
           </View>
 
-          {/* Fields */}
           <View style={st.form}>
             {/* Full name */}
             <View style={st.field}>
               <Text style={[st.label, { color: C.text2 }]}>FULL NAME</Text>
-              <View style={[st.inputRow, { backgroundColor: C.surface2, borderColor: C.divider }]}>
+              <View style={[st.inputRow, { backgroundColor: C.surface2, borderColor: errors.name ? C.error : C.divider }]}>
                 <TextInput
                   style={[st.input, { color: C.text1 }]}
                   placeholder="John Doe"
                   placeholderTextColor={C.text3}
                   value={fullName}
-                  onChangeText={setFullName}
+                  onChangeText={(v) => { setFullName(v); if (errors.name) setErrors((p) => ({ ...p, name: '' })); }}
                   autoCapitalize="words"
                 />
-                <Ionicons name="person-outline" size={18} color={C.text3} />
+                <Ionicons name="person-outline" size={18} color={errors.name ? C.error : C.text3} />
               </View>
+              {!!errors.name && <Text style={[st.errorText, { color: C.error }]}>{errors.name}</Text>}
             </View>
 
             {/* Email */}
             <View style={st.field}>
               <Text style={[st.label, { color: C.text2 }]}>EMAIL</Text>
-              <View style={[st.inputRow, { backgroundColor: C.surface2, borderColor: C.divider }]}>
+              <View style={[st.inputRow, { backgroundColor: C.surface2, borderColor: errors.email ? C.error : C.divider }]}>
                 <TextInput
                   style={[st.input, { color: C.text1 }]}
                   placeholder="you@example.com"
                   placeholderTextColor={C.text3}
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={(v) => { setEmail(v); if (errors.email) setErrors((p) => ({ ...p, email: '' })); }}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
-                <Ionicons name="mail-outline" size={18} color={C.text3} />
+                <Ionicons name="mail-outline" size={18} color={errors.email ? C.error : C.text3} />
               </View>
+              {!!errors.email && <Text style={[st.errorText, { color: C.error }]}>{errors.email}</Text>}
             </View>
 
             {/* Password */}
             <View style={st.field}>
               <Text style={[st.label, { color: C.text2 }]}>PASSWORD</Text>
-              <View style={[st.inputRow, { backgroundColor: C.surface2, borderColor: C.divider }]}>
+              <View style={[st.inputRow, { backgroundColor: C.surface2, borderColor: errors.password ? C.error : C.divider }]}>
                 <TextInput
                   style={[st.input, { color: C.text1 }]}
                   placeholder="Min. 6 characters"
                   placeholderTextColor={C.text3}
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(v) => { setPassword(v); if (errors.password) setErrors((p) => ({ ...p, password: '' })); }}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                 />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                  <Ionicons
-                    name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                    size={18}
-                    color={C.text3}
-                  />
+                  <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={18} color={errors.password ? C.error : C.text3} />
                 </TouchableOpacity>
               </View>
 
@@ -179,15 +174,13 @@ export default function SignupScreen() {
                 <View style={st.strengthRow}>
                   <View style={st.strengthBars}>
                     {[0, 1, 2].map((i) => (
-                      <View
-                        key={i}
-                        style={[st.strengthBar, { backgroundColor: C.divider }, i < pw.bars && { backgroundColor: pw.color }]}
-                      />
+                      <View key={i} style={[st.strengthBar, { backgroundColor: C.divider }, i < pw.bars && { backgroundColor: pw.color }]} />
                     ))}
                   </View>
                   <Text style={[st.strengthLabel, { color: pw.color }]}>{pw.label}</Text>
                 </View>
               )}
+              {!!errors.password && <Text style={[st.errorText, { color: C.error }]}>{errors.password}</Text>}
             </View>
 
             {/* Submit */}
@@ -199,10 +192,7 @@ export default function SignupScreen() {
             >
               {loading
                 ? <ActivityIndicator color="#fff" />
-                : <>
-                    <Text style={st.submitText}>Create account</Text>
-                    <Ionicons name="arrow-forward" size={18} color="#fff" />
-                  </>
+                : <><Text style={st.submitText}>Create account</Text><Ionicons name="arrow-forward" size={18} color="#fff" /></>
               }
             </TouchableOpacity>
 
@@ -223,11 +213,7 @@ const st = StyleSheet.create({
   safe:   { flex: 1 },
   scroll: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 32 },
 
-  backBtn: {
-    width: 40, height: 40, borderRadius: 12,
-    alignItems: 'center', justifyContent: 'center',
-    marginTop: 8, marginBottom: 28,
-  },
+  backBtn: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8, marginBottom: 28 },
 
   brand:     { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 28 },
   brandIcon: { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
@@ -238,36 +224,18 @@ const st = StyleSheet.create({
   link:  { fontWeight: '700' },
 
   roleWrap: { marginBottom: 22 },
-  roleToggle: {
-    flexDirection: 'row',
-    borderWidth: 1.5,
-    borderRadius: 12, padding: 4, gap: 4,
-    marginTop: 8,
-  },
-  roleBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: 6,
-    paddingVertical: 11, borderRadius: 9,
-  },
-  roleBtnActive: {
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
-  },
+  roleToggle: { flexDirection: 'row', borderWidth: 1.5, borderRadius: 12, padding: 4, gap: 4, marginTop: 8 },
+  roleBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 11, borderRadius: 9 },
+  roleBtnActive: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
   roleBtnText:       { fontSize: 13, fontWeight: '500' },
   roleBtnTextActive: { fontWeight: '700' },
 
   form: { gap: 0 },
-  field:    { marginBottom: 18 },
-  label: {
-    fontSize: 10, fontWeight: '700',
-    letterSpacing: 0.9, textTransform: 'uppercase', marginBottom: 8,
-  },
+  field: { marginBottom: 18 },
+  label: { fontSize: 10, fontWeight: '700', letterSpacing: 0.9, textTransform: 'uppercase', marginBottom: 8 },
+  errorText: { fontSize: 12, fontWeight: '500', marginTop: 5 },
 
-  inputRow: {
-    flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1.5,
-    borderRadius: 12, paddingHorizontal: 14, height: 50, gap: 8,
-  },
+  inputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 14, height: 50, gap: 8 },
   input: { flex: 1, fontSize: 15 },
 
   strengthRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
@@ -275,16 +243,9 @@ const st = StyleSheet.create({
   strengthBar: { flex: 1, height: 3, borderRadius: 2 },
   strengthLabel: { fontSize: 11, fontWeight: '700', minWidth: 42, textAlign: 'right' },
 
-  submitBtn: {
-    borderRadius: 14, height: 52,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, marginTop: 8,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 10, elevation: 6,
-  },
+  submitBtn: { borderRadius: 14, height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6 },
   submitText: { fontSize: 15, fontWeight: '800', color: '#fff' },
   disabled:   { opacity: 0.55 },
 
   terms: { fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 16 },
 });
-

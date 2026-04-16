@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { getJob, claimJob, updateJobStatus, uploadProofImage } from '@/app/actions/jobs';
 import { useColors } from '@/lib/themeContext';
+import { useToast } from '@/lib/toastContext';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { ChatWindow } from '@/components/chat/ChatWindow';
 import { useAuth } from '@/lib/authContext';
@@ -20,6 +21,7 @@ export default function EmployeeJobDetailScreen() {
   const router  = useRouter();
   const { user } = useAuth();
   const C = useColors();
+  const toast = useToast();
 
   const [job,          setJob]          = useState<Job | null>(null);
   const [loading,      setLoading]      = useState(true);
@@ -73,7 +75,7 @@ export default function EmployeeJobDetailScreen() {
       await updateJobStatus(id, 'PENDING_REVIEW', urls, proofDesc);
       setModalVisible(false);
       setJob(await getJob(id));
-      Alert.alert('Submitted! ✅', "Job sent for customer review. You'll be paid when they approve.");
+      toast.show("Job submitted for review. You'll be paid when approved.");
     } catch (err: any) { Alert.alert('Error', err.message ?? 'Could not submit.'); }
     finally { setSubmitting(false); }
   }

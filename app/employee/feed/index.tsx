@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { getOpenJobs, claimJob } from '@/app/actions/jobs';
 import { useColors } from '@/lib/themeContext';
+import { useToast } from '@/lib/toastContext';
 import { JobCard } from '@/components/shared/JobCard';
 import type { Job } from '@/types';
 
@@ -17,6 +18,7 @@ export default function EmployeeFeedScreen() {
   const router = useRouter();
   const C = useColors();
   const insets = useSafeAreaInsets();
+  const toast = useToast();
   const [jobs,       setJobs]       = useState<Job[]>([]);
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -38,7 +40,7 @@ export default function EmployeeFeedScreen() {
         try {
           await claimJob(jobId);
           setJobs((prev) => prev.filter((j) => j.id !== jobId));
-          Alert.alert('Claimed! 🎉', 'Go to History to manage this job.');
+          toast.show('Job claimed! Go to My Jobs to manage it.');
         } catch (err: any) { Alert.alert('Failed', err.message ?? 'Try again.'); }
         finally { setClaiming(null); }
       }},

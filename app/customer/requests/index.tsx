@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { getCustomerJobs, updateJobStatus, approveJobCompletion } from '@/app/actions/jobs';
 import { useTheme } from '@/lib/themeContext';
+import { useToast } from '@/lib/toastContext';
 import { JobCard } from '@/components/shared/JobCard';
 import type { Job, JobStatus } from '@/types';
 
@@ -27,6 +28,7 @@ const FILTERS: { value: FilterVal; label: string }[] = [
 export default function CustomerRequestsScreen() {
   const router = useRouter();
   const { colors: C, statusColors: S } = useTheme();
+  const toast = useToast();
   const insets = useSafeAreaInsets();
   const [jobs,       setJobs]       = useState<Job[]>([]);
   const [loading,    setLoading]    = useState(true);
@@ -67,7 +69,7 @@ export default function CustomerRequestsScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Approve', onPress: async () => {
         setApproving(id);
-        try { await approveJobCompletion(id); fetchJobs(); Alert.alert('Done!', 'Payment released ✅'); }
+        try { await approveJobCompletion(id); fetchJobs(); toast.show('Payment released.'); }
         catch (err: any) { Alert.alert('Error', err.message); }
         finally { setApproving(null); }
       }},

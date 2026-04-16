@@ -10,6 +10,7 @@ import { getEmployeeJobs } from '@/app/actions/jobs';
 import { signOut } from '@/app/actions/auth';
 import { StatCard } from '@/components/shared/StatCard';
 import { JobCard } from '@/components/shared/JobCard';
+import { JobCardSkeleton } from '@/components/shared/SkeletonLoader';
 import type { Job } from '@/types';
 
 const { width } = Dimensions.get('window');
@@ -112,9 +113,7 @@ export default function EmployeeDashboardScreen() {
         <View style={st.section}>
           <Text style={[st.sectionTitle, { color: C.text1 }]}>Recent Activity</Text>
           {loading ? (
-            <View style={[st.emptyCard, { backgroundColor: C.surface, borderColor: C.divider }]}>
-              <Text style={[st.emptyText, { color: C.text3 }]}>Loading…</Text>
-            </View>
+            <><JobCardSkeleton /><JobCardSkeleton /></>
           ) : jobs.length === 0 ? (
             <View style={[st.emptyCard, { backgroundColor: C.surface, borderColor: C.divider }]}>
               <Ionicons name="briefcase-outline" size={32} color={C.text3} />
