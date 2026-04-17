@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { getJob, approveJobCompletion, updateJobStatus } from '@/app/actions/jobs';
 import { useTheme } from '@/lib/themeContext';
 import { useAuth } from '@/lib/authContext';
+import { useToast } from '@/lib/toastContext';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { ChatWindow } from '@/components/chat/ChatWindow';
 import type { Job } from '@/types';
@@ -19,6 +20,7 @@ export default function CustomerJobDetailScreen() {
   const router    = useRouter();
   const { colors: C, isDark } = useTheme();
   const { refreshProfile } = useAuth();
+  const toast = useToast();
   const [job,       setJob]       = useState<Job | null>(null);
   const [loading,   setLoading]   = useState(true);
   const [approving, setApproving] = useState(false);
@@ -39,7 +41,7 @@ export default function CustomerJobDetailScreen() {
           await approveJobCompletion(id);
           setJob(await getJob(id));
           await refreshProfile();
-          Alert.alert('Approved!', 'Payment released to the cleaner ✅');
+          toast.show('Payment released to the cleaner.');
         } catch (err: any) { Alert.alert('Error', err.message); }
         finally { setApproving(false); }
       }},

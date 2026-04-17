@@ -10,7 +10,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { getEmployeeJobs, updateJobStatus, uploadProofImage } from '@/app/actions/jobs';
 import { useColors } from '@/lib/themeContext';
+import { useToast } from '@/lib/toastContext';
 import { JobCard } from '@/components/shared/JobCard';
+import { JobCardSkeleton } from '@/components/shared/SkeletonLoader';
 import type { Job } from '@/types';
 import { useAuth } from '@/lib/authContext';
 
@@ -18,6 +20,7 @@ export default function EmployeeMyJobsScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const C = useColors();
+  const toast = useToast();
   const insets = useSafeAreaInsets();
 
   const [jobs,         setJobs]         = useState<Job[]>([]);
@@ -69,7 +72,7 @@ export default function EmployeeMyJobsScreen() {
       const urls = await Promise.all(images.map((uri) => uploadProofImage(uri, user.id)));
       await updateJobStatus(selectedJob.id, 'PENDING_REVIEW', urls, proofDesc);
       setModalVisible(false);
-      Alert.alert('Submitted! ✅', 'Job sent for customer review.');
+      toast.show('Job submitted for customer review.');
       fetchJobs();
     } catch (err: any) { Alert.alert('Error', err.message ?? 'Could not submit.'); }
     finally { setSubmitting(false); }
@@ -88,7 +91,7 @@ export default function EmployeeMyJobsScreen() {
       </View>
 
       {loading ? (
-        <View style={st.center}><ActivityIndicator size="large" color={C.blue600} /></View>
+        <View style={{ padding: 16 }}><JobCardSkeleton /><JobCardSkeleton /></View>
       ) : (
         <FlatList
           data={jobs}

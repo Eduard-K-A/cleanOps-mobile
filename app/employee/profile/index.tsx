@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/lib/authContext';
 import { useColors, useTheme } from '@/lib/themeContext';
+import { useToast } from '@/lib/toastContext';
 import { updateProfile } from '@/app/actions/profile';
 import { withdraw } from '@/app/actions/payments';
 
@@ -16,6 +17,7 @@ export default function EmployeeProfileScreen() {
   const { profile, refreshProfile } = useAuth();
   const C = useColors();
   const { colorMode, setColorMode } = useTheme();
+  const toast = useToast();
 
   const [name,   setName]   = useState(profile?.full_name ?? '');
   const [phone,  setPhone]  = useState(profile?.phone ?? '');
@@ -38,7 +40,7 @@ export default function EmployeeProfileScreen() {
     try {
       await updateProfile(name, phone);
       await refreshProfile();
-      Alert.alert('Saved', 'Profile updated successfully.');
+      toast.show('Profile updated successfully.');
     } catch (err: any) { Alert.alert('Error', err.message); }
     finally { setSaving(false); }
   }
@@ -55,7 +57,7 @@ export default function EmployeeProfileScreen() {
       await refreshProfile();
       setModalVisible(false);
       setAmount('');
-      Alert.alert('Success', `$${parsed.toFixed(2)} withdrawn from your earnings.`);
+      toast.show(`$${parsed.toFixed(2)} withdrawn successfully.`);
     } catch (err: any) {
       Alert.alert('Failed', err.message ?? 'Withdrawal failed. Try again.');
     } finally {

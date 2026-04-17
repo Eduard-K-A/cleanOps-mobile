@@ -1,15 +1,28 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '@/lib/authContext';
 import { ThemeProvider, useTheme } from '@/lib/themeContext';
+import { ToastProvider, useToast } from '@/lib/toastContext';
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { LoadingScreen } from '@/components/shared/LoadingScreen';
 
 function RootNav() {
   const { user, role, loading } = useAuth();
   const { isDark } = useTheme();
+  const toast    = useToast();
   const segments = useSegments();
   const router   = useRouter();
+  const prevUser = useRef<typeof user>(undefined);
+
+  // Detect unexpected sign-out (session expiry)
+  useEffect(() => {
+    if (loading) return;
+    if (prevUser.current !== undefined && prevUser.current !== null && user === null) {
+      toast.show('Your session has ended. Please sign in again.', 'info');
+    }
+    prevUser.current = user;
+  }, [user, loading]);
 
   useEffect(() => {
     if (loading) return;
@@ -57,10 +70,14 @@ function RootNav() {
 
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <RootNav />
-      </AuthProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <RootNav />
+          </ToastProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

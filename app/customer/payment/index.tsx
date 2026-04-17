@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView, Platform,
+  ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView, Platform, RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/lib/themeContext';
+import { useToast } from '@/lib/toastContext';
 import { getBalance, addMoney, withdraw } from '@/app/actions/payments';
 import { getCustomerJobs } from '@/app/actions/jobs';
 import { useAuth } from '@/lib/authContext';
@@ -19,9 +20,11 @@ export default function CustomerPaymentScreen() {
   const { colors: C, statusColors: S } = useTheme();
   const insets = useSafeAreaInsets();
   const { profile, refreshProfile } = useAuth();
+  const toast = useToast();
 
   const [recentJobs, setRecentJobs] = useState<Job[]>([]);
   const [loading,    setLoading]    = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [modalMode,  setModalMode]  = useState<ModalMode>(null);
   const [amount,     setAmount]     = useState('');
   const [processing, setProcessing] = useState(false);
@@ -31,7 +34,7 @@ export default function CustomerPaymentScreen() {
       const jobs = await getCustomerJobs();
       setRecentJobs(jobs.filter((j) => j.status === 'COMPLETED').slice(0, 5));
     } catch (e) { console.warn(e); }
-    finally { setLoading(false); }
+    finally { setLoading(false); setRefreshing(false); }
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -51,10 +54,10 @@ export default function CustomerPaymentScreen() {
     try {
       if (modalMode === 'deposit') {
         await addMoney(parsed);
-        Alert.alert('Success', `$${parsed.toFixed(2)} added to your wallet.`);
+        toast.show(`$${parsed.toFixed(2)} added to your wallet.`);
       } else {
         await withdraw(parsed);
-        Alert.alert('Success', `$${parsed.toFixed(2)} withdrawn from your wallet.`);
+        toast.show(`$${parsed.toFixed(2)} withdrawn successfully.`);
       }
       setModalMode(null);
       setLoading(true);
@@ -82,7 +85,11 @@ export default function CustomerPaymentScreen() {
       {loading ? (
         <View style={st.center}><ActivityIndicator size="large" color={C.blue600} /></View>
       ) : (
-        <ScrollView contentContainerStyle={[st.scroll, { paddingBottom: insets.bottom + 24 }]} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={[st.scroll, { paddingBottom: insets.bottom + 24 }]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} tintColor={C.blue600} />}
+        >
           {/* Balance card */}
           <View style={[st.balanceCard, { backgroundColor: C.blue700 }]}>
             <Text style={st.balanceLabel}>Available Balance</Text>
@@ -132,10 +139,14 @@ export default function CustomerPaymentScreen() {
           </View>
 
           {/* Recent payments */}
-          {recentJobs.length > 0 && (
-            <View style={st.section}>
-              <Text style={[st.sectionTitle, { color: C.text1 }]}>Recent Payments</Text>
-              {recentJobs.map((job) => (
+          <View style={st.section}>
+            <Text style={[st.sectionTitle, { color: C.text1 }]}>Recent Payments</Text>
+            {recentJobs.length === 0 ? (
+              <View style={[st.emptyCard, { backgroundColor: C.surface, borderColor: C.divider }]}>
+                <Ionicons name="receipt-outline" size={32} color={C.text3} />
+                <Text style={[st.emptyText, { color: C.text3 }]}>No payments yet</Text>
+              </View>
+            ) : recentJobs.map((job) => (
                 <View key={job.id} style={[st.paymentRow, { backgroundColor: C.surface, borderColor: C.divider }]}>
                   <View>
                     <Text style={[st.paymentId, { color: C.text1 }]}>#{job.id.slice(0, 8).toUpperCase()}</Text>
@@ -149,8 +160,7 @@ export default function CustomerPaymentScreen() {
                   </View>
                 </View>
               ))}
-            </View>
-          )}
+          </View>
         </ScrollView>
       )}
 
@@ -225,6 +235,8 @@ const st = StyleSheet.create({
   infoText: { fontSize: 13, flex: 1, lineHeight: 19 },
   section:  { gap: 10 },
   sectionTitle: { fontSize: 15, fontWeight: '800' },
+  emptyCard: { borderRadius: 14, padding: 28, alignItems: 'center', gap: 8, borderWidth: 1 },
+  emptyText: { fontSize: 14 },
   paymentRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 12, padding: 14, borderWidth: 1 },
   paymentId:    { fontSize: 13, fontWeight: '700' },
   paymentDate:  { fontSize: 12 },
