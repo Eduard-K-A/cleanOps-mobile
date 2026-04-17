@@ -7,8 +7,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getAllJobs, updateJobStatus } from '@/app/actions/jobs';
-import { signOut } from '@/app/actions/auth';
+import { getAllJobs, updateJobStatus } from '@/actions/jobs';
+import { signOut } from '@/actions/auth';
 import { Colors, STATUS_COLORS } from '@/constants/colors';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { StatCard } from '@/components/shared/StatCard';

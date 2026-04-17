@@ -8,7 +8,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/lib/authContext';
-import { getMessages, sendMessage, subscribeToMessages } from '@/app/actions/messages';
+import { getMessages, sendMessage, subscribeToMessages } from '@/actions/messages';
 import { useColors } from '@/lib/themeContext';
 import type { Message } from '@/types';
 

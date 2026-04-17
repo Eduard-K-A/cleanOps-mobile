@@ -9,7 +9,7 @@ import { useRouter, Link } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { signIn } from '@/app/actions/auth';
+import { signIn } from '@/actions/auth';
 import { supabase } from '@/lib/supabase';
 import { useColors } from '@/lib/themeContext';
 import { useToast } from '@/lib/toastContext';

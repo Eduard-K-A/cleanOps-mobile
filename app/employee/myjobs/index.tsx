@@ -8,7 +8,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { getEmployeeJobs, updateJobStatus, uploadProofImage } from '@/app/actions/jobs';
+import { getEmployeeJobs, updateJobStatus, uploadProofImage } from '@/actions/jobs';
 import { useColors } from '@/lib/themeContext';
 import { useToast } from '@/lib/toastContext';
 import { JobCard } from '@/components/shared/JobCard';

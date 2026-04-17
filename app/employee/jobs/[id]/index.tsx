@@ -8,7 +8,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { getJob, claimJob, updateJobStatus, uploadProofImage } from '@/app/actions/jobs';
+import { getJob, claimJob, updateJobStatus, uploadProofImage } from '@/actions/jobs';
 import { useColors } from '@/lib/themeContext';
 import { useToast } from '@/lib/toastContext';
 import { StatusBadge } from '@/components/shared/StatusBadge';

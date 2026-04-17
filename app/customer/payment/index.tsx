@@ -8,8 +8,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/lib/themeContext';
 import { useToast } from '@/lib/toastContext';
-import { getBalance, addMoney, withdraw } from '@/app/actions/payments';
-import { getCustomerJobs } from '@/app/actions/jobs';
+import { getBalance, addMoney, withdraw } from '@/actions/payments';
+import { getCustomerJobs } from '@/actions/jobs';
 import { useAuth } from '@/lib/authContext';
 import type { Job } from '@/types';
 
