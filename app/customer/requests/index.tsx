@@ -8,7 +8,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { getCustomerJobs, updateJobStatus, approveJobCompletion } from '@/app/actions/jobs';
+import { getCustomerJobs, updateJobStatus, approveJobCompletion } from '@/actions/jobs';
 import { useTheme } from '@/lib/themeContext';
 import { useToast } from '@/lib/toastContext';
 import { JobCard } from '@/components/shared/JobCard';

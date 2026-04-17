@@ -1,4 +1,4 @@
-// Mobile equivalent of app/actions/messages.ts
+// Mobile equivalent of actions/messages.ts
 import { supabase } from '@/lib/supabase';
 import type { Message } from '@/types';
 

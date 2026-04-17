@@ -7,17 +7,17 @@ Sits alongside the `frontend/` folder — both share the same Supabase backend.
 
 ```
 mobile-app/
+├── actions/                      # Supabase calls (mirrors web app/actions/)
+│   ├── auth.ts
+│   ├── jobs.ts
+│   ├── messages.ts
+│   └── payments.ts
 ├── app/                          # Screens (mirrors web app/ structure)
 │   ├── _layout.tsx               # Root layout + auth guard
 │   ├── index.tsx                 # Redirect to homepage
 │   ├── homepage/index.tsx        # Welcome / landing screen
 │   ├── login/index.tsx           # Sign in
 │   ├── signup/index.tsx          # Register (customer or employee)
-│   ├── actions/                  # Supabase calls (mirrors web app/actions/)
-│   │   ├── auth.ts
-│   │   ├── jobs.ts
-│   │   ├── messages.ts
-│   │   └── payments.ts
 │   ├── customer/
 │   │   ├── dashboard/index.tsx   # Customer home
 │   │   ├── order/index.tsx       # 4-step booking form
@@ -76,5 +76,5 @@ Scan the QR code with the **Expo Go** app on your Android device.
 ## Notes
 
 - Supabase credentials are pre-configured in `lib/supabase.ts` (same project as the web frontend)
-- The `app/actions/` files are the mobile equivalent of the web's `app/actions/` — same file names, rewritten to use the Supabase JS client directly instead of Next.js server actions
+- The `actions/` files are the mobile equivalent of the web's `app/actions/` — same file names, rewritten to use the Supabase JS client directly instead of Next.js server actions
 - Navigation uses Expo Router (file-based routing, same concept as Next.js App Router)

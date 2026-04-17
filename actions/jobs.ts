@@ -1,4 +1,4 @@
-// Mobile equivalent of app/actions/jobs.ts
+// Mobile equivalent of actions/jobs.ts
 import { supabase } from '@/lib/supabase';
 import type { Job, JobStatus, JobUrgency } from '@/types';
 

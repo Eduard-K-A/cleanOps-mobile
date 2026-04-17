@@ -1,4 +1,4 @@
-// Mobile equivalent of the web's app/actions/auth.ts
+// Mobile equivalent of the web's actions/auth.ts
 // Uses Supabase JS client directly (no Next.js server actions on mobile)
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/types';

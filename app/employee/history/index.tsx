@@ -7,7 +7,7 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { getEmployeeJobs } from '@/app/actions/jobs';
+import { getEmployeeJobs } from '@/actions/jobs';
 import { useColors } from '@/lib/themeContext';
 import { JobCard } from '@/components/shared/JobCard';
 import type { Job } from '@/types';

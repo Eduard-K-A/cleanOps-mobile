@@ -9,7 +9,7 @@ import { useRouter, Link } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { signUp } from '@/app/actions/auth';
+import { signUp } from '@/actions/auth';
 import { useColors } from '@/lib/themeContext';
 
 const { width } = Dimensions.get('window');

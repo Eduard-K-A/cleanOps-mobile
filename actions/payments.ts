@@ -1,4 +1,4 @@
-// Mobile equivalent of the web's app/actions/payments.ts
+// Mobile equivalent of the web's actions/payments.ts
 import { supabase } from '@/lib/supabase';
 
 export async function addMoney(amount: number): Promise<void> {

@@ -9,8 +9,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/lib/authContext';
 import { useColors, useTheme } from '@/lib/themeContext';
 import { useToast } from '@/lib/toastContext';
-import { updateProfile } from '@/app/actions/profile';
-import { withdraw } from '@/app/actions/payments';
+import { updateProfile } from '@/actions/profile';
+import { withdraw } from '@/actions/payments';
 
 export default function EmployeeProfileScreen() {
   const router = useRouter();

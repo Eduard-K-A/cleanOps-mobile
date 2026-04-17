@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '@/lib/authContext';
 import { ThemeProvider, useTheme } from '@/lib/themeContext';
 import { ToastProvider, useToast } from '@/lib/toastContext';
@@ -70,14 +71,16 @@ function RootNav() {
 
 export default function RootLayout() {
   return (
-    <ErrorBoundary>
-      <ThemeProvider>
-        <AuthProvider>
-          <ToastProvider>
-            <RootNav />
-          </ToastProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </ErrorBoundary>
+    <SafeAreaProvider>
+      <ErrorBoundary>
+        <ThemeProvider>
+          <AuthProvider>
+            <ToastProvider>
+              <RootNav />
+            </ToastProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </ErrorBoundary>
+    </SafeAreaProvider>
   );
 }
