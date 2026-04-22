@@ -7,6 +7,7 @@ export async function signUp(formData: {
   email: string;
   password: string;
   fullName: string;
+  phoneNumber: string;
   role: 'customer' | 'employee';
 }) {
   const { data, error } = await supabase.auth.signUp({
@@ -15,6 +16,7 @@ export async function signUp(formData: {
     options: {
       data: {
         full_name: formData.fullName.trim(),
+        phone: formData.phoneNumber.trim(),
         role: formData.role,
       },
     },
@@ -26,6 +28,7 @@ export async function signUp(formData: {
     await createProfile({
       id: data.user.id,
       fullName: formData.fullName.trim(),
+      phoneNumber: formData.phoneNumber.trim(),
       role: formData.role,
     });
   }
@@ -50,6 +53,7 @@ export async function signOut() {
 export async function createProfile(profileData: {
   id: string;
   fullName: string;
+  phoneNumber: string;
   role: 'customer' | 'employee';
 }): Promise<{ success: boolean; data?: Profile; error?: string }> {
   const { data, error } = await (supabase as any)
@@ -57,6 +61,7 @@ export async function createProfile(profileData: {
     .insert({
       id: profileData.id,
       full_name: profileData.fullName,
+      phone: profileData.phoneNumber,
       role: profileData.role,
     })
     .select()

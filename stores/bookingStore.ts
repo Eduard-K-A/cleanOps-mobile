@@ -1,37 +1,50 @@
 // Mobile equivalent of the web's stores/bookingStore
-// Uses React state instead of Zustand (simpler, no extra dependency)
 import type { JobUrgency } from '@/types';
 
-export const SIZES = [
-  'Small (1–2 rooms)',
-  'Medium (3–4 rooms)',
-  'Large (5+ rooms)',
+export type CleanType = {
+  id: string;
+  label: string;
+  sub: string;
+  price: number;
+  icon: string;
+};
+
+export const CLEAN_TYPES: CleanType[] = [
+  { id: 'regular',  label: 'Standard Refresh', sub: 'Routine maintenance clean', price: 6000,  icon: '🧹' },
+  { id: 'deep',     label: 'All-in-One Reset', sub: 'The complete home overhaul', price: 25000, icon: '✨' },
+  { id: 'move_out', label: 'Move-In / Move-Out', sub: 'Empty property transition', price: 18000, icon: '📦' },
 ];
 
 export const TASKS = [
-  'Dusting',
-  'Vacuuming',
-  'Mopping',
-  'Bathrooms',
-  'Kitchen',
-  'Windows',
+  { id: 'vacuum',  label: 'Vacuum all rooms', icon: '🧺' },
+  { id: 'mop',     label: 'Mop floors',       icon: '🪣' },
+  { id: 'bath',    label: 'Clean bathrooms',  icon: '🚿' },
+  { id: 'kitchen', label: 'Clean kitchen',    icon: '🍳' },
+  { id: 'dishes',  label: 'Do the dishes',    icon: '🍽️' },
+  { id: 'laundry', label: 'Laundry & fold',   icon: '👕' },
+  { id: 'windows', label: 'Wash windows',     icon: '🪟' },
+  { id: 'trash',   label: 'Empty trash',      icon: '🗑️' },
+  { id: 'dust',    label: 'Dust surfaces',    icon: '🪴' },
+  { id: 'fridge',  label: 'Clean fridge',     icon: '❄️' },
+  { id: 'oven',    label: 'Clean oven',       icon: '♨️' },
+  { id: 'outdoor', label: 'Outdoor/balcony',  icon: '🌿' },
 ];
 
-export const URGENCIES: { value: JobUrgency; label: string; desc: string }[] = [
-  { value: 'LOW',    label: 'Low',    desc: 'Flexible schedule, −10%' },
-  { value: 'NORMAL', label: 'Normal', desc: 'Standard timing' },
-  { value: 'HIGH',   label: 'High',   desc: 'ASAP priority, +30%' },
+export const URGENCIES: { value: JobUrgency; label: string; desc: string; fee: number; color: string }[] = [
+  { value: 'LOW',    label: 'Standard Priority', desc: 'Flexible, within a week', fee: 0,     color: '#16a34a' },
+  { value: 'NORMAL', label: 'Medium Priority',   desc: 'Within 48 hours',        fee: 1000,  color: '#d97706' },
+  { value: 'HIGH',   label: 'Urgent Priority',   desc: 'ASAP — act fast!',       fee: 2500,  color: '#dc2626' },
 ];
 
-const SIZE_BASE: Record<string, number> = {
-  'Small (1–2 rooms)':  6500,
-  'Medium (3–4 rooms)': 10000,
-  'Large (5+ rooms)':   15000,
-};
+export function computePrice(typeId: string, urgency: JobUrgency, tasksCount: number): number {
+  const type = CLEAN_TYPES.find(t => t.id === typeId);
+  const base = type?.price ?? 6000;
+  
+  const urgencyObj = URGENCIES.find(u => u.value === urgency);
+  const urgencyFee = urgencyObj?.fee ?? 0;
+  
+  // All-in-One is a premium flat rate (no extra task fees)
+  const taskFee = typeId === 'deep' ? 0 : (tasksCount * 500);
 
-export function computePrice(size: string, urgency: JobUrgency, tasks: string[]): number {
-  const base = SIZE_BASE[size] ?? 6500;
-  const mult = urgency === 'HIGH' ? 1.3 : urgency === 'LOW' ? 0.9 : 1;
-  const taskMultiplier = 1 + 0.12 * tasks.length;
-  return Math.round(base * mult * taskMultiplier);
+  return base + urgencyFee + taskFee;
 }

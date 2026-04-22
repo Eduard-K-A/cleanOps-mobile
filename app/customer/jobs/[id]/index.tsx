@@ -1,25 +1,32 @@
-// Mobile equivalent of app/customer/jobs/[id]/page.tsx
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Alert, ActivityIndicator, Image, Modal,
+  TouchableOpacity, Alert, ActivityIndicator, Image, Modal, BackHandler, StatusBar, Platform
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { getJob, approveJobCompletion, updateJobStatus } from '@/actions/jobs';
+import { LinearGradient } from 'expo-linear-gradient';
+import { getJob, approveJobCompletion, cancelJob, approveApplication } from '@/actions/jobs';
 import { useTheme } from '@/lib/themeContext';
 import { useAuth } from '@/lib/authContext';
 import { useToast } from '@/lib/toastContext';
-import { StatusBadge } from '@/components/shared/StatusBadge';
 import { ChatWindow } from '@/components/chat/ChatWindow';
 import type { Job } from '@/types';
+
+const STEPS = [
+  { id: 'OPEN', label: 'Posted' },
+  { id: 'IN_PROGRESS', label: 'Cleaning' },
+  { id: 'PENDING_REVIEW', label: 'Review' },
+  { id: 'COMPLETED', label: 'Done' }
+];
 
 export default function CustomerJobDetailScreen() {
   const { id }    = useLocalSearchParams<{ id: string }>();
   const router    = useRouter();
-  const { colors: C, isDark } = useTheme();
+  const { colors: C, isDark, statusColors: SC } = useTheme();
   const { refreshProfile } = useAuth();
+  const insets = useSafeAreaInsets();
   const toast = useToast();
   const [job,       setJob]       = useState<Job | null>(null);
   const [loading,   setLoading]   = useState(true);
@@ -28,9 +35,47 @@ export default function CustomerJobDetailScreen() {
   const [showChat,  setShowChat]  = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
+  async function fetchJob() {
+    try {
+      const data = await getJob(id);
+      setJob(data);
+    } catch (err) {
+      console.warn(err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    getJob(id).then(setJob).catch(console.warn).finally(() => setLoading(false));
+    const onBackPress = () => {
+      if (showChat) { setShowChat(false); return true; }
+      if (router.canGoBack()) router.back();
+      else router.replace('/customer');
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [showChat]);
+
+  useEffect(() => {
+    fetchJob();
   }, [id]);
+
+  async function handleApproveCleaner() {
+    if (!job?.employee_name) return;
+    setApproving(true);
+    try {
+      // In this premium flow, worker_name holds the candidate name if status is OPEN
+      // In a real app, worker_id would be the applicant's ID.
+      await approveApplication(id, (job as any).worker_id || ''); 
+      await fetchJob();
+      toast.show('Cleaner approved!');
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    } finally {
+      setApproving(false);
+    }
+  }
 
   async function handleApprove() {
     Alert.alert('Approve & Release Payment?', 'The cleaner will receive their payment.', [
@@ -54,7 +99,7 @@ export default function CustomerJobDetailScreen() {
       { text: 'Cancel', style: 'destructive', onPress: async () => {
         setCancelling(true);
         try {
-          await updateJobStatus(id, 'CANCELLED');
+          await cancelJob(id);
           setJob(await getJob(id));
           await refreshProfile();
         } catch (err: any) { Alert.alert('Error', err.message); }
@@ -63,106 +108,130 @@ export default function CustomerJobDetailScreen() {
     ]);
   }
 
+  const goBack = () => {
+    if (showChat) setShowChat(false);
+    else if (router.canGoBack()) router.back();
+    else router.replace('/customer');
+  };
+
   if (loading) return (
-    <SafeAreaView style={[st.safe, { backgroundColor: C.bg }]}><View style={st.center}><ActivityIndicator size="large" color={C.blue600} /></View></SafeAreaView>
+    <View style={[st.container, { backgroundColor: '#f0f4f8' }]}><View style={st.center}><ActivityIndicator size="large" color={C.blue600} /></View></View>
   );
   if (!job) return (
-    <SafeAreaView style={[st.safe, { backgroundColor: C.bg }]}><View style={st.center}><Text style={{ color: C.text3 }}>Job not found</Text></View></SafeAreaView>
+    <View style={[st.container, { backgroundColor: '#f0f4f8' }]}><View style={st.center}><Text style={{ color: C.text3 }}>Job not found</Text></View></View>
   );
 
+  const price = (job.price_amount / 100).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const isUrgent = job.urgency === 'HIGH';
+  const urgencyColor = isUrgent ? '#22c55e' : '#22c55e'; // matching figma Standard Priority
+  const urgencyText = isUrgent ? '#166534' : '#166534';
+  const urgencyLabel = isUrgent ? 'Urgent Priority' : job.urgency === 'NORMAL' ? 'Medium Priority' : 'Standard Priority';
+  
+  const currentStepIdx = STEPS.findIndex(s => s.id === job.status);
+  const taskCount = job.tasks?.length || 0;
+  const completedCount = 0; // Placeholder
+
   return (
-    <SafeAreaView style={[st.safe, { backgroundColor: C.bg }]}>
-      {/* Top bar */}
-      <View style={[st.topBar, { backgroundColor: C.surface, borderBottomColor: C.divider }]}>
-        <TouchableOpacity style={[st.backBtn, { backgroundColor: C.surface2 }]} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={20} color={C.text2} />
-        </TouchableOpacity>
-        <Text style={[st.topTitle, { color: C.text1 }]}>Job Details</Text>
-        <TouchableOpacity
-          style={[st.chatToggleBtn, showChat && st.chatToggleBtnActive, { backgroundColor: showChat ? C.blue600 : C.blue50, borderColor: showChat ? C.blue600 : C.blue100 }]}
-          onPress={() => setShowChat(!showChat)}
-        >
-          <Ionicons name="chatbubble-outline" size={18} color={showChat ? '#fff' : C.blue600} />
-        </TouchableOpacity>
-      </View>
+    <View style={[st.container, { backgroundColor: '#f0f4f8' }]}>
+      <StatusBar barStyle="light-content" />
+
+      {/* Gradient Header */}
+      <LinearGradient
+        colors={['#0c4a6e', '#0284c7']}
+        style={[st.headerGradient, { paddingTop: insets.top + 12 }]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+      >
+        <View style={st.headerContent}>
+          <TouchableOpacity style={st.backBtn} onPress={goBack}>
+            <Ionicons name="arrow-back" size={20} color="#fff" />
+          </TouchableOpacity>
+          <View style={st.headerTextWrap}>
+            <Text style={st.headerTitle} numberOfLines={1}>{job.tasks?.[0] || 'Regular Clean'}</Text>
+            <View style={st.statusPill}>
+               <Text style={st.statusPillText}>{SC[job.status]?.label || 'Open'}</Text>
+            </View>
+          </View>
+          <Text style={st.headerPrice}>${price}</Text>
+        </View>
+      </LinearGradient>
 
       {showChat ? (
-        <ChatWindow jobId={id} />
+        <View style={st.chatContainer}>
+          <ChatWindow jobId={id} />
+        </View>
       ) : (
-        <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
-          {/* Price hero */}
-          <View style={[st.heroCard, { backgroundColor: C.blue700 }]}>
-            <View style={st.heroTop}>
-              <Text style={st.jobId}>#{job.id.slice(0, 8).toUpperCase()}</Text>
-              <StatusBadge status={job.status} />
+        <ScrollView contentContainerStyle={[st.scroll, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
+          
+          {/* Job Progress */}
+          <View style={st.card}>
+            <Text style={st.cardTitle}>Job Progress</Text>
+            <View style={st.stepperContainer}>
+               {STEPS.map((step, idx) => {
+                 const isCompleted = currentStepIdx >= idx;
+                 return (
+                   <View key={step.id} style={st.stepWrapper}>
+                      <View style={st.stepNode}>
+                         <View style={[st.stepCircle, isCompleted ? st.stepCircleActive : st.stepCircleInactive]}>
+                            <View style={[st.stepInnerDot, isCompleted ? st.stepInnerDotActive : st.stepInnerDotInactive]} />
+                         </View>
+                         <Text style={[st.stepLabel, isCompleted ? st.stepLabelActive : st.stepLabelInactive]}>{step.label}</Text>
+                      </View>
+                      {idx < STEPS.length - 1 && (
+                        <View style={st.stepLineWrapper}>
+                          <View style={[st.stepLine, currentStepIdx > idx ? st.stepLineActive : st.stepLineInactive]} />
+                        </View>
+                      )}
+                   </View>
+                 )
+               })}
             </View>
-            <Text style={st.price}>${(job.price_amount / 100).toFixed(2)}</Text>
-            <Text style={st.priceNote}>held in escrow</Text>
           </View>
 
           {/* Details */}
-          <View style={[st.card, { backgroundColor: C.surface, borderColor: C.divider }]}>
-            <Text style={[st.cardTitle, { color: C.text1 }]}>Job Info</Text>
-            {[
-              { icon: 'person-outline' as const,    label: 'Cleaner',  value: job.employee_name, show: job.status !== 'OPEN' },
-              { icon: 'call-outline' as const,      label: 'Cleaner Phone', value: job.employee_phone, show: !!job.employee_phone },
-              { icon: 'resize-outline' as const,    label: 'Size',     value: job.size || '—', show: true },
-              { icon: 'location-outline' as const,  label: 'Location', value: job.location_address || '—', show: true },
-              { icon: 'flash-outline' as const,     label: 'Urgency',  value: job.urgency, show: true },
-              { icon: 'time-outline' as const,      label: 'Created',  value: new Date(job.created_at).toLocaleString(), show: true },
-            ].filter(r => r.show).map((row) => (
-              <View key={row.label} style={st.detailRow}>
-                <Ionicons name={row.icon} size={17} color={C.text3} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[st.detailLabel, { color: C.text3 }]}>{row.label.toUpperCase()}</Text>
-                  <Text style={[st.detailValue, { color: C.text1 }]}>{row.value || 'Waiting for cleaner...'}</Text>
-                </View>
-              </View>
+          <View style={st.card}>
+            <Text style={st.cardTitle}>Details</Text>
+            
+            <View style={st.detailRow}>
+              <Ionicons name="location-outline" size={14} color="#3f3f46" />
+              <Text style={st.detailText}>{job.location_address || 'Address not set'}</Text>
+            </View>
+            
+            <View style={st.detailRow}>
+              <View style={[st.urgencyDot, { backgroundColor: urgencyColor }]} />
+              <Text style={[st.urgencyText, { color: urgencyText }]}>{urgencyLabel}</Text>
+            </View>
+
+            <View style={st.tasksProgress}>
+               <Text style={st.tasksProgressLabel}>Tasks — {completedCount}/{taskCount} done</Text>
+               <View style={st.progressBarBg}>
+                  <LinearGradient 
+                    colors={['#0ea5e9', '#0284c7']} 
+                    style={[st.progressBarFill, { width: `${taskCount > 0 ? (completedCount/taskCount)*100 : 0}%` }]} 
+                    start={{x: 0, y: 0}} end={{x: 1, y: 0}}
+                  />
+               </View>
+            </View>
+
+            {job.tasks?.map((t, i) => (
+               <View key={i} style={st.taskItem}>
+                 <View style={st.taskCheckbox} />
+                 <Text style={st.taskText}>🧺 {t}</Text>
+               </View>
             ))}
           </View>
 
-          {/* Tasks */}
-          {job.tasks?.length > 0 && (
-            <View style={[st.card, { backgroundColor: C.surface, borderColor: C.divider }]}>
-              <Text style={[st.cardTitle, { color: C.text1 }]}>Tasks Requested</Text>
-              <View style={st.tagsWrap}>
-                {job.tasks.map((t) => (
-                  <View key={t} style={[st.tag, { backgroundColor: C.blue50 }]}>
-                    <Ionicons name="checkmark-outline" size={13} color={C.blue600} />
-                    <Text style={[st.tagText, { color: C.blue700 }]}>{t}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-
-          {/* Custom Instructions */}
-          {job.custom_instructions && (
-            <View style={[st.card, { backgroundColor: C.surface, borderColor: C.divider }]}>
-              <View style={st.cardHeaderRow}>
-                <Ionicons name="create-outline" size={18} color={C.blue600} />
-                <Text style={[st.cardTitle, { color: C.text1 }]}>Your Instructions</Text>
-              </View>
-              <Text style={[st.proofDesc, { color: C.text1 }]}>{job.custom_instructions}</Text>
-            </View>
-          )}
-
           {/* Proof of work */}
           {job.proof_urls && job.proof_urls.length > 0 && (
-            <View style={[st.card, { backgroundColor: C.surface, borderColor: C.divider }]}>
-              <View style={st.cardHeaderRow}>
-                <Ionicons name="camera-outline" size={18} color={C.blue600} />
-                <Text style={[st.cardTitle, { color: C.text1 }]}>Proof of Work</Text>
-              </View>
-
+            <View style={st.card}>
+              <Text style={st.cardTitle}>Proof of Work</Text>
               {job.proof_description ? (
                 <View style={[st.commentBox, { backgroundColor: C.surface2 }]}>
                   <Text style={[st.commentLabel, { color: C.text3 }]}>CLEANER'S COMMENT</Text>
-                  <Text style={[st.proofDesc, { color: C.text1 }]}>{job.proof_description}</Text>
+                  <Text style={st.detailText}>{job.proof_description}</Text>
                 </View>
               ) : null}
-
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.proofScroll}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginTop: 8}}>
                 {job.proof_urls.map((url, i) => (
                   <TouchableOpacity key={i} onPress={() => setSelectedImage(url)}>
                     <Image source={{ uri: url }} style={st.proofImage} />
@@ -172,13 +241,60 @@ export default function CustomerJobDetailScreen() {
             </View>
           )}
 
+          {/* Chat Preview / Toggle */}
+          <View style={st.card}>
+            <Text style={st.cardTitle}>Chat</Text>
+            <Text style={st.chatEmptyText}>Click below to open chat</Text>
+            <TouchableOpacity style={st.openChatBtn} onPress={() => setShowChat(true)}>
+               <Text style={st.openChatBtnText}>Open Chat Window</Text>
+               <Ionicons name="chatbubbles-outline" size={16} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Applications Section */}
+          {job.status === 'OPEN' && (
+            <View style={st.card}>
+              <Text style={st.cardTitle}>Interested Cleaners</Text>
+              {job.employee_name ? (
+                <View style={st.applicantCard}>
+                  <View style={st.applicantInfo}>
+                    <View style={st.avatarPlaceholder}>
+                      <Ionicons name="person" size={20} color="#94a3b8" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={st.applicantName}>{job.employee_name}</Text>
+                      <View style={st.ratingRow}>
+                        <Ionicons name="star" size={12} color="#fbbf24" />
+                        <Text style={st.ratingText}>5.0 • Highly Recommended</Text>
+                      </View>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={[st.approveCleanerBtn, approving && st.disabled]}
+                    onPress={handleApproveCleaner}
+                    disabled={approving}
+                  >
+                    <LinearGradient colors={['#0ea5e9', '#0284c7']} style={st.btnGradient}>
+                      {approving ? <ActivityIndicator color="#fff" /> : <Text style={st.approveCleanerText}>Approve & Hire</Text>}
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={st.emptyApplicants}>
+                   <ActivityIndicator size="small" color={C.blue600} />
+                   <Text style={st.emptyApplicantsText}>Waiting for cleaners to apply…</Text>
+                </View>
+              )}
+            </View>
+          )}
+
           {/* Approve */}
           {job.status === 'PENDING_REVIEW' && (
-            <View style={[st.reviewCard, { backgroundColor: isDark ? '#3b2a0a' : '#FFFBEB', borderColor: isDark ? '#fbbf24' : '#FDE68A' }]}>
-              <Text style={[st.reviewTitle, { color: isDark ? '#fbbf24' : '#92400E' }]}>Cleaner marked this job as done</Text>
-              <Text style={[st.reviewDesc, { color: isDark ? '#fef3c7' : '#78350F' }]}>Review the proof of work above, then approve to release payment.</Text>
+            <View style={[st.card, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}>
+              <Text style={[st.cardTitle, { color: '#166534' }]}>Ready for Review</Text>
+              <Text style={{ fontSize: 13, color: '#15803d', marginBottom: 12 }}>Cleaner marked this job as done. Review and approve to release payment.</Text>
               <TouchableOpacity
-                style={[st.approveBtn, { backgroundColor: C.success }, approving && st.disabled]}
+                style={[st.approveBtn, { backgroundColor: '#16a34a' }, approving && st.disabled]}
                 onPress={handleApprove}
                 disabled={approving}
               >
@@ -186,7 +302,7 @@ export default function CustomerJobDetailScreen() {
                   ? <ActivityIndicator color="#fff" />
                   : <>
                       <Ionicons name="checkmark-circle" size={18} color="#fff" />
-                      <Text style={st.approveBtnText}>Approve & Release Payment</Text>
+                      <Text style={st.approveBtnText}>Approve Payment</Text>
                     </>
                 }
               </TouchableOpacity>
@@ -196,15 +312,16 @@ export default function CustomerJobDetailScreen() {
           {/* Cancel */}
           {job.status === 'OPEN' && (
             <TouchableOpacity
-              style={[st.cancelBtn, { borderColor: C.error, backgroundColor: isDark ? '#3b0f0f' : '#FEF2F2' }, cancelling && st.disabled]}
+              style={[st.cancelBtn, cancelling && st.disabled]}
               onPress={handleCancel}
               disabled={cancelling}
             >
-              <Text style={[st.cancelBtnText, { color: C.error }]}>{cancelling ? 'Cancelling…' : 'Cancel Request'}</Text>
+              <Text style={st.cancelBtnText}>{cancelling ? 'Cancelling…' : 'Cancel Job'}</Text>
             </TouchableOpacity>
           )}
         </ScrollView>
       )}
+
       {/* Image Preview Modal */}
       <Modal visible={!!selectedImage} transparent animationType="fade">
         <View style={st.modalOverlay}>
@@ -216,86 +333,175 @@ export default function CustomerJobDetailScreen() {
           )}
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const st = StyleSheet.create({
-  safe:  { flex: 1 },
-  center:{ flex: 1, alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  topBar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1,
+  headerGradient: {
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    paddingBottom: 16,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    gap: 12,
   },
   backBtn: {
-    width: 38, height: 38, borderRadius: 11,
+    width: 36, height: 36, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center', justifyContent: 'center',
   },
-  topTitle: { fontSize: 16, fontWeight: '700' },
-  chatToggleBtn: {
-    width: 38, height: 38, borderRadius: 11,
-    borderWidth: 1,
-    alignItems: 'center', justifyContent: 'center',
+  headerTextWrap: { flex: 1, alignItems: 'flex-start' },
+  headerTitle: { fontSize: 14, fontWeight: '700', color: '#fff', marginBottom: 4 },
+  statusPill: {
+    backgroundColor: '#dbeafe',
+    paddingHorizontal: 8, paddingVertical: 2,
+    borderRadius: 12,
   },
-  chatToggleBtnActive: { },
+  statusPillText: { fontSize: 12, fontWeight: '600', color: '#1d4ed8' },
+  headerPrice: { fontSize: 18, fontWeight: '700', color: '#fff' },
 
-  scroll: { padding: 16, gap: 14, paddingBottom: 36 },
+  chatContainer: { flex: 1, backgroundColor: '#f0f4f8', borderTopLeftRadius: 24, borderTopRightRadius: 24, marginTop: 16, overflow: 'hidden' },
 
-  heroCard: {
-    borderRadius: 16,
-    padding: 20, alignItems: 'center',
-  },
-  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  jobId:   { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.6)', letterSpacing: 0.5 },
-  price:   { fontSize: 38, fontWeight: '900', color: '#fff', letterSpacing: -1 },
-  priceNote:{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 2 },
+  scroll: { padding: 16, gap: 12 },
 
   card: {
-    borderRadius: 16, padding: 16,
-    borderWidth: 1, gap: 12,
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e8edf3',
   },
-  cardTitle: { fontSize: 14, fontWeight: '800' },
-  detailRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  detailLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  detailValue: { fontSize: 14, fontWeight: '600', marginTop: 2 },
+  cardTitle: { fontSize: 14, fontWeight: '700', color: '#0f172b', marginBottom: 12 },
 
-  tagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tag: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6,
+  stepperContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10 },
+  stepWrapper: { flexDirection: 'row', alignItems: 'center' },
+  stepNode: { alignItems: 'center', width: 44 },
+  stepCircle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  stepCircleActive: { backgroundColor: '#0284c7' },
+  stepCircleInactive: { backgroundColor: '#f1f5f9' },
+  stepInnerDot: { width: 8, height: 8, borderRadius: 4 },
+  stepInnerDotActive: { backgroundColor: '#fff' },
+  stepInnerDotInactive: { backgroundColor: '#cbd5e1' },
+  stepLabel: { fontSize: 9, fontWeight: '600', marginTop: 4, textAlign: 'center' },
+  stepLabelActive: { color: '#0284c7' },
+  stepLabelInactive: { color: '#94a3b8' },
+  stepLineWrapper: { width: 30, paddingHorizontal: 4, marginTop: -16 },
+  stepLine: { height: 2, borderRadius: 1, width: '100%' },
+  stepLineActive: { backgroundColor: '#0284c7' },
+  stepLineInactive: { backgroundColor: '#e2e8f0' },
+
+  detailRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  detailText: { fontSize: 14, color: '#45556c' },
+  urgencyDot: { width: 14, height: 14, borderRadius: 7 },
+  urgencyText: { fontSize: 14, fontWeight: '600' },
+
+  tasksProgress: { marginTop: 12, marginBottom: 16 },
+  tasksProgressLabel: { fontSize: 12, fontWeight: '600', color: '#62748e', marginBottom: 8 },
+  progressBarBg: { height: 6, backgroundColor: '#f1f5f9', borderRadius: 3, overflow: 'hidden' },
+  progressBarFill: { height: '100%', borderRadius: 3 },
+  
+  taskItem: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  taskCheckbox: { width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f1f5f9' },
+  taskText: { fontSize: 12, color: '#0f172a' },
+
+  chatEmptyText: { fontSize: 12, color: '#90a1b9', textAlign: 'center', marginVertical: 12 },
+  openChatBtn: {
+    backgroundColor: '#0ea5e9',
+    borderRadius: 16, paddingVertical: 12,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8
   },
-  tagText: { fontSize: 13, fontWeight: '600' },
+  openChatBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 
-  cardHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  commentBox: { borderRadius: 12, padding: 12, gap: 4 },
-  commentLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
-  proofDesc: { fontSize: 14, lineHeight: 20 },
-  proofScroll: { marginTop: 4 },
-  proofImage: { width: 100, height: 100, borderRadius: 12, marginRight: 10 },
-
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
-  modalCloseBtn: { position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 10 },
-  fullImage: { width: '100%', height: '80%' },
-
-  reviewCard: {
-    borderRadius: 16, padding: 16,
-    borderWidth: 1, gap: 10,
+  cancelBtn: {
+    backgroundColor: '#fff1f2',
+    borderWidth: 1, borderColor: '#fecdd3',
+    borderRadius: 16, paddingVertical: 15,
+    alignItems: 'center',
   },
-  reviewTitle: { fontSize: 15, fontWeight: '800' },
-  reviewDesc:  { fontSize: 13, lineHeight: 18 },
+  cancelBtnText: { fontSize: 14, fontWeight: '600', color: '#e11d48' },
+  
   approveBtn: {
     borderRadius: 12, paddingVertical: 14,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
-  approveBtnText: { fontSize: 14, fontWeight: '800', color: '#fff' },
+  approveBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
 
-  cancelBtn: {
-    borderWidth: 1.5, borderRadius: 14,
-    paddingVertical: 14, alignItems: 'center',
+  commentBox: { borderRadius: 12, padding: 12, gap: 4 },
+  commentLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+  proofImage: { width: 80, height: 80, borderRadius: 12, marginRight: 10 },
+
+  applicantCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginTop: 4,
   },
-  cancelBtnText: { fontSize: 14, fontWeight: '700' },
+  applicantInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  avatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  applicantName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  ratingText: {
+    fontSize: 11,
+    color: '#64748b',
+  },
+  approveCleanerBtn: {
+    height: 44,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  btnGradient: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  approveCleanerText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  emptyApplicants: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    gap: 8,
+  },
+  emptyApplicantsText: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontStyle: 'italic',
+  },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
+  modalCloseBtn: { position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 10 },
+  fullImage: { width: '100%', height: '80%' },
   disabled: { opacity: 0.5 },
 });
-

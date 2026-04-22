@@ -166,6 +166,17 @@ export async function claimJob(jobId: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Unauthorized');
 
+  // Validation: Check if job is still OPEN
+  const { data: job } = await (supabase as any)
+    .from('jobs')
+    .select('status')
+    .eq('id', jobId)
+    .single();
+
+  if (!job || job.status !== 'OPEN') {
+    throw new Error('This job is no longer available to be claimed.');
+  }
+
   // Fetch employee name and phone
   const { data: profile } = await (supabase as any)
     .from('profiles')
@@ -188,6 +199,93 @@ export async function claimJob(jobId: string): Promise<void> {
       worker_phone: profile?.phone 
     })
     .eq('id', jobId);
+}
+
+export async function applyForJob(jobId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Unauthorized');
+
+  // Validation: Check if job is still OPEN
+  const { data: job } = await (supabase as any)
+    .from('jobs')
+    .select('status, custom_instructions')
+    .eq( 'id', jobId)
+    .single();
+
+  if (!job || job.status !== 'OPEN') {
+    throw new Error('This job is no longer available.');
+  }
+
+  // Fetch employee details
+  const { data: profile } = await (supabase as any)
+    .from('profiles')
+    .select('full_name, avatar_url, rating')
+    .eq('id', user.id)
+    .single();
+
+  // We'll store applicants in a hidden JSON block at the end of custom_instructions
+  // or a metadata field if available. For now, let's use a mock-ready update.
+  const currentApplicants = []; // In a real app, this would be a join table
+  const newApplicant = { 
+    id: user.id, 
+    name: profile?.full_name || 'Cleaner', 
+    avatar: profile?.avatar_url,
+    rating: profile?.rating || 5.0
+  };
+
+  // For this mockup/premium flow, we'll "apply" by setting the worker fields 
+  // but keeping the status OPEN. The customer will then "Approve" them.
+  const { error } = await (supabase as any)
+    .from('jobs')
+    .update({ 
+      worker_name: newApplicant.name,
+      worker_phone: user.phone || 'N/A', // SUPPOSE employee_id is used for candidate
+      // employee_id: user.id // Don't set this yet, or it counts as "claimed"
+    })
+    .eq('id', jobId);
+
+  if (error) throw error;
+}
+
+export async function approveApplication(jobId: string, employeeId: string): Promise<void> {
+  // Use the existing claim_job RPC to officially assign and start the job
+  const { error } = await (supabase as any).rpc('claim_job', {
+    p_job_id: jobId,
+    p_employee_id: employeeId,
+  });
+
+  if (error) throw error;
+  
+  // Status is now IN_PROGRESS via RPC
+}
+
+export async function cancelJob(jobId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Unauthorized');
+
+  const { data: job, error: jobErr } = await (supabase as any)
+    .from('jobs')
+    .select('*')
+    .eq('id', jobId)
+    .single();
+
+  if (jobErr || !job) throw new Error('Job not found');
+  if (job.customer_id !== user.id) throw new Error('Forbidden');
+  if (job.status !== 'OPEN') {
+    throw new Error('Can only cancel jobs that haven\'t been claimed yet.');
+  }
+
+  // Refund logic: Return price_amount to user balance
+  const refundAmount = job.price_amount / 100;
+  const { error: refundErr } = await (supabase as any).rpc('add_money', {
+    user_id: user.id,
+    amount: refundAmount,
+  });
+
+  if (refundErr) throw new Error('Failed to process refund. Please contact support.');
+
+  // Update status
+  await updateJobStatus(jobId, 'CANCELLED');
 }
 
 export async function updateJobStatus(
