@@ -37,7 +37,7 @@ function RootNav() {
       if (inPublic) {
         if (role === 'employee')      router.replace('/employee/dashboard');
         else if (role === 'admin')    router.replace('/admin/dashboard');
-        else                          router.replace('/customer/dashboard');
+        else                          router.replace('/customer');
       }
     }
   }, [user, role, loading, segments]);
@@ -51,18 +51,21 @@ function RootNav() {
         <Stack.Screen name="homepage/index"    />
         <Stack.Screen name="login/index"       />
         <Stack.Screen name="signup/index"      />
-        <Stack.Screen name="customer/dashboard/index" />
+        
+        {/* Customer Section */}
+        <Stack.Screen name="customer/(tabs)"   />
         <Stack.Screen name="customer/order/index"     />
-        <Stack.Screen name="customer/requests/index"  />
-        <Stack.Screen name="customer/payment/index"   />
         <Stack.Screen name="customer/jobs/[id]/index" />
-        <Stack.Screen name="customer/profile/index"   />
+        
+        {/* Employee Section */}
         <Stack.Screen name="employee/dashboard/index" />
         <Stack.Screen name="employee/feed/index"      />
         <Stack.Screen name="employee/history/index"   />
         <Stack.Screen name="employee/myjobs/index"    />
         <Stack.Screen name="employee/jobs/[id]/index" />
         <Stack.Screen name="employee/profile/index"   />
+
+        {/* Admin Section */}
         <Stack.Screen name="admin/dashboard/index"    />
       </Stack>
     </>

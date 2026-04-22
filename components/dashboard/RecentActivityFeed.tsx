@@ -3,7 +3,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, STATUS_COLORS } from '@/constants/colors';
+import { useTheme } from '@/lib/themeContext';
 import type { Job } from '@/types';
 
 interface Props {
@@ -14,6 +14,7 @@ interface Props {
 
 export function RecentActivityFeed({ jobs, role = 'customer', loading = false }: Props) {
   const router = useRouter();
+  const { colors: C, statusColors: SC } = useTheme();
 
   function goToJob(id: string) {
     const base = role === 'employee' ? '/employee/jobs' : '/customer/jobs';
@@ -23,7 +24,7 @@ export function RecentActivityFeed({ jobs, role = 'customer', loading = false }:
   if (loading) {
     return (
       <View style={styles.empty}>
-        <Text style={styles.emptyText}>Loading…</Text>
+        <Text style={[styles.emptyText, { color: C.text3 }]}>Loading activities…</Text>
       </View>
     );
   }
@@ -31,8 +32,8 @@ export function RecentActivityFeed({ jobs, role = 'customer', loading = false }:
   if (jobs.length === 0) {
     return (
       <View style={styles.empty}>
-        <Ionicons name="document-outline" size={28} color={Colors.text3} />
-        <Text style={styles.emptyText}>No recent activity</Text>
+        <Ionicons name="document-text-outline" size={32} color={C.text3} />
+        <Text style={[styles.emptyText, { color: C.text3 }]}>No recent activity yet</Text>
       </View>
     );
   }
@@ -40,16 +41,51 @@ export function RecentActivityFeed({ jobs, role = 'customer', loading = false }:
   return (
     <View style={styles.container}>
       {jobs.slice(0, 5).map((job) => {
-        const s = STATUS_COLORS[job.status] ?? STATUS_COLORS['OPEN'];
+        const s = SC[job.status] ?? SC['OPEN'];
+        
+        // Contextual description
+        let desc = 'Job created and awaiting assignment';
+        let icon: keyof typeof Ionicons.glyphMap = 'sparkles';
+        let iconColor = C.blue600;
+
+        if (job.status === 'IN_PROGRESS') {
+          desc = job.employee_name ? `${job.employee_name} is cleaning your space` : 'Cleaning in progress';
+          icon = 'time' as const;
+          iconColor = C.warning;
+        } else if (job.status === 'PENDING_REVIEW') {
+          desc = 'Job completed! Please review and approve';
+          icon = 'eye' as const;
+          iconColor = '#db2777';
+        } else if (job.status === 'COMPLETED') {
+          desc = 'Service finalized and payment released';
+          icon = 'checkmark-circle' as const;
+          iconColor = C.success;
+        } else if (job.status === 'CANCELLED') {
+          desc = 'Job was cancelled';
+          icon = 'close-circle' as const;
+          iconColor = C.error;
+        }
+
         return (
-          <TouchableOpacity key={job.id} style={styles.row} onPress={() => goToJob(job.id)} activeOpacity={0.75}>
-            <View style={[styles.dot, { backgroundColor: s.text }]} />
-            <View style={styles.rowInfo}>
-              <Text style={styles.rowId}>#{job.id.slice(0, 8).toUpperCase()}</Text>
-              <Text style={styles.rowStatus} numberOfLines={1}>{s.label}</Text>
+          <TouchableOpacity 
+            key={job.id} 
+            style={[styles.row, { backgroundColor: C.surface, borderColor: C.divider }]} 
+            onPress={() => goToJob(job.id)} 
+            activeOpacity={0.7}
+          >
+            <View style={[styles.iconBox, { backgroundColor: `${iconColor}15` }]}>
+              <Ionicons name={icon} size={18} color={iconColor} />
             </View>
-            <Text style={styles.rowPrice}>${(job.price_amount / 100).toFixed(2)}</Text>
-            <Ionicons name="chevron-forward" size={16} color={Colors.text3} />
+            
+            <View style={styles.rowInfo}>
+              <View style={styles.rowTop}>
+                <Text style={[styles.rowId, { color: C.text1 }]}>#{job.id.slice(0, 6).toUpperCase()}</Text>
+                <Text style={[styles.rowTime, { color: C.text3 }]}>{new Date(job.created_at).toLocaleDateString()}</Text>
+              </View>
+              <Text style={[styles.rowDesc, { color: C.text3 }]} numberOfLines={1}>{desc}</Text>
+            </View>
+            
+            <Ionicons name="chevron-forward" size={16} color={C.text3} />
           </TouchableOpacity>
         );
       })}
@@ -58,26 +94,26 @@ export function RecentActivityFeed({ jobs, role = 'customer', loading = false }:
 }
 
 const styles = StyleSheet.create({
-  container: { gap: 2 },
+  container: { gap: 10 },
 
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
+    gap: 12,
+    padding: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: Colors.divider,
-    marginBottom: 6,
   },
-  dot:       { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
-  rowInfo:   { flex: 1 },
-  rowId:     { fontSize: 13, fontWeight: '700', color: Colors.text1 },
-  rowStatus: { fontSize: 12, color: Colors.text3, marginTop: 1 },
-  rowPrice:  { fontSize: 14, fontWeight: '700', color: Colors.blue700 },
+  iconBox: {
+    width: 40, height: 40, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  rowInfo:   { flex: 1, gap: 2 },
+  rowTop:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  rowId:     { fontSize: 13, fontWeight: '700' },
+  rowTime:   { fontSize: 11 },
+  rowDesc:   { fontSize: 12, fontWeight: '500' },
 
-  empty: { alignItems: 'center', paddingVertical: 24, gap: 8 },
-  emptyText: { fontSize: 14, color: Colors.text3 },
+  empty: { alignItems: 'center', paddingVertical: 32, gap: 12 },
+  emptyText: { fontSize: 14, fontWeight: '500' },
 });

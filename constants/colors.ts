@@ -29,7 +29,7 @@ export const DarkColors = {
   blue800: '#1e6dbf',
   bg:       '#0f172a',
   surface:  '#1e293b',
-  surface2: '#293548',
+  surface2: '#334155',
   text1: '#f1f5f9',
   text2: '#94a3b8',
   text3: '#64748b',

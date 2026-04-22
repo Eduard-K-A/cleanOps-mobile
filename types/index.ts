@@ -2,6 +2,21 @@ export type UserRole = 'customer' | 'employee' | 'admin';
 export type JobStatus = 'OPEN' | 'IN_PROGRESS' | 'PENDING_REVIEW' | 'COMPLETED' | 'CANCELLED';
 export type JobUrgency = 'LOW' | 'NORMAL' | 'HIGH';
 
+export type PaymentBrand = 'Visa' | 'Mastercard' | 'Maya' | 'GCash';
+export type PaymentType = 'card' | 'e-wallet';
+
+export interface PaymentMethod {
+  id: string;
+  type: PaymentType;
+  brand: PaymentBrand;
+  last4?: string;
+  expiry?: string;
+  cvc?: string;
+  cardholderName?: string;
+  phoneNumber?: string;
+  isDefault: boolean;
+}
+
 export interface Profile {
   id: string;
   full_name: string;

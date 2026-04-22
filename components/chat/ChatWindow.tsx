@@ -1,4 +1,3 @@
-// Mobile equivalent of components/chat/ChatWindow.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput,
@@ -7,9 +6,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/lib/authContext';
 import { getMessages, sendMessage, subscribeToMessages } from '@/actions/messages';
-import { useColors } from '@/lib/themeContext';
+import { useTheme } from '@/lib/themeContext';
 import type { Message } from '@/types';
 
 interface Props {
@@ -23,7 +23,7 @@ function formatTime(dateStr: string): string {
 
 export function ChatWindow({ jobId }: Props) {
   const { user } = useAuth();
-  const C = useColors();
+  const { colors: C, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading,  setLoading]  = useState(true);
@@ -31,7 +31,7 @@ export function ChatWindow({ jobId }: Props) {
   const [sending,  setSending]  = useState(false);
   const [kbVisible, setKbVisible] = useState(false);
   const listRef   = useRef<FlatList>(null);
-  const sentIds   = useRef<Set<string>>(new Set()); // track IDs we sent to avoid realtime dupe
+  const sentIds   = useRef<Set<string>>(new Set()); 
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -80,13 +80,12 @@ export function ChatWindow({ jobId }: Props) {
     setSending(true);
     try {
       const msg = await sendMessage(jobId, content);
-      // Track this ID so realtime doesn't add it again
       sentIds.current.add(msg.id);
       setMessages((prev) => [...prev, msg]);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (e) {
       console.warn(e);
-      setText(content); // restore on fail
+      setText(content); 
     } finally {
       setSending(false);
     }
@@ -98,13 +97,11 @@ export function ChatWindow({ jobId }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
-      {/* Header */}
       <View style={[st.header, { borderBottomColor: C.divider }]}>
-        <Ionicons name="chatbubbles-outline" size={18} color={C.blue600} />
+        <Ionicons name="chatbubbles-outline" size={18} color={C.text1} />
         <Text style={[st.headerTitle, { color: C.text1 }]}>Job Chat</Text>
       </View>
 
-      {/* Messages */}
       {loading ? (
         <View style={st.center}>
           <ActivityIndicator color={C.blue600} />
@@ -119,7 +116,7 @@ export function ChatWindow({ jobId }: Props) {
           ListEmptyComponent={
             <View style={st.emptyWrap}>
               <Ionicons name="chatbubble-ellipses-outline" size={36} color={C.text3} />
-              <Text style={[st.emptyText, { color: C.text3 }]}>No messages yet. Start the conversation!</Text>
+              <Text style={[st.emptyText, { color: C.text3 }]}>No messages yet.</Text>
             </View>
           }
           renderItem={({ item }) => {
@@ -127,13 +124,13 @@ export function ChatWindow({ jobId }: Props) {
             return (
               <View style={[st.msgRow, isOwn && st.msgRowOwn]}>
                 {!isOwn && (
-                  <View style={[st.avatar, { backgroundColor: C.blue50 }]}>
-                    <Text style={[st.avatarText, { color: C.blue700 }]}>
+                  <View style={[st.avatar, { backgroundColor: isDark ? C.blue800 : C.blue50 }]}>
+                    <Text style={[st.avatarText, { color: C.blue400 }]}>
                       {(item.profiles?.full_name ?? 'U').charAt(0).toUpperCase()}
                     </Text>
                   </View>
                 )}
-                <View style={[st.bubble, isOwn ? { backgroundColor: C.blue600 } : { backgroundColor: C.surface2 }, isOwn && st.bubbleOwn]}>
+                <View style={[st.bubble, isOwn ? st.bubbleOwn : [st.bubbleOther, { backgroundColor: isDark ? C.surface2 : '#f1f5f9' }]]}>
                   {!isOwn && item.profiles?.full_name && (
                     <Text style={[st.senderName, { color: C.blue600 }]}>{item.profiles.full_name}</Text>
                   )}
@@ -148,30 +145,34 @@ export function ChatWindow({ jobId }: Props) {
         />
       )}
 
-      {/* Input */}
-      <View style={[st.inputRow, { 
-        borderTopColor: C.divider, 
-        backgroundColor: C.surface,
-        paddingBottom: kbVisible ? 12 : Math.max(insets.bottom, 12)
-      }]}>
-        <TextInput
-          style={[st.input, { backgroundColor: C.surface2, borderColor: C.divider, color: C.text1 }]}
-          placeholder="Type a message…"
-          placeholderTextColor={C.text3}
-          value={text}
-          onChangeText={setText}
-          multiline
-          maxLength={500}
-        />
+      <View style={[st.inputRow, { paddingBottom: kbVisible ? 12 : Math.max(insets.bottom, 12) }]}>
+        <View style={[st.inputContainer, { backgroundColor: isDark ? C.surface2 : '#f1f5f9' }]}>
+          <TextInput
+            style={[st.input, { color: C.text1 }]}
+            placeholder="Type a message..."
+            placeholderTextColor={C.text3}
+            value={text}
+            onChangeText={setText}
+            multiline
+            maxLength={500}
+          />
+        </View>
         <TouchableOpacity
-          style={[st.sendBtn, { backgroundColor: C.blue600 }, (!text.trim() || sending) && st.sendBtnDisabled]}
+          style={[st.sendBtnWrapper, (!text.trim() || sending) && st.sendBtnDisabled]}
           onPress={handleSend}
           disabled={!text.trim() || sending}
         >
-          {sending
-            ? <ActivityIndicator size="small" color="#fff" />
-            : <Ionicons name="send" size={18} color="#fff" />
-          }
+          <LinearGradient
+            colors={['#0ea5e9', '#0284c7']}
+            style={st.sendBtn}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            {sending
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Ionicons name="send" size={15} color="#fff" style={{ marginLeft: 2 }} />
+            }
+          </LinearGradient>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -179,54 +180,67 @@ export function ChatWindow({ jobId }: Props) {
 }
 
 const st = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, borderRadius: 24, overflow: 'hidden' },
 
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    padding: 14, borderBottomWidth: 1,
+    padding: 16, borderBottomWidth: 1,
   },
-  headerTitle: { fontSize: 15, fontWeight: '700' },
+  headerTitle: { fontSize: 14, fontWeight: '700' },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  messageList: { padding: 14, gap: 12, flexGrow: 1 },
+  messageList: { padding: 16, gap: 12, flexGrow: 1 },
 
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingTop: 40 },
-  emptyText: { fontSize: 14, textAlign: 'center' },
+  emptyText: { fontSize: 12, textAlign: 'center' },
 
   msgRow:    { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
   msgRowOwn: { flexDirection: 'row-reverse' },
 
   avatar: {
-    width: 30, height: 30, borderRadius: 15,
+    width: 28, height: 28, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
   },
-  avatarText: { fontSize: 12, fontWeight: '700' },
+  avatarText: { fontSize: 11, fontWeight: '700' },
 
   bubble: {
     maxWidth: '75%',
     borderRadius: 16, borderBottomLeftRadius: 4,
-    padding: 10, gap: 3,
+    padding: 12, gap: 4,
   },
   bubbleOwn: {
+    backgroundColor: '#0ea5e9',
     borderBottomLeftRadius: 16, borderBottomRightRadius: 4,
+  },
+  bubbleOther: {
   },
   senderName: { fontSize: 11, fontWeight: '700', marginBottom: 2 },
   msgText:    { fontSize: 14, lineHeight: 20 },
-  msgTime:    { fontSize: 10, alignSelf: 'flex-end' },
+  msgTime:    { fontSize: 10, alignSelf: 'flex-end', marginTop: 2 },
 
   inputRow: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 10,
-    padding: 12, borderTopWidth: 1,
+    padding: 16,
+  },
+  inputContainer: {
+    flex: 1,
+    borderRadius: 16,
+    justifyContent: 'center',
+    minHeight: 40,
   },
   input: {
-    flex: 1, borderRadius: 20,
-    borderWidth: 1,
-    paddingHorizontal: 14, paddingVertical: 10,
-    fontSize: 14, maxHeight: 100,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 12,
+    maxHeight: 100,
+  },
+  sendBtnWrapper: {
+    width: 40, height: 40, borderRadius: 16,
+    overflow: 'hidden'
   },
   sendBtn: {
-    width: 40, height: 40, borderRadius: 20,
+    width: '100%', height: '100%',
     alignItems: 'center', justifyContent: 'center',
   },
   sendBtnDisabled: { opacity: 0.4 },

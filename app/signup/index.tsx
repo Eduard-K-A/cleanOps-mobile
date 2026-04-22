@@ -1,12 +1,12 @@
-// Mobile equivalent of app/signup/page.tsx
-import React, { useState } from 'react';
+// Mobile equivalent of app/signup/index.tsx
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   ActivityIndicator, KeyboardAvoidingView,
   Platform, ScrollView, Dimensions,
 } from 'react-native';
-import { useRouter, Link } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { signUp } from '@/actions/auth';
@@ -14,48 +14,128 @@ import { useColors } from '@/lib/themeContext';
 
 const { width } = Dimensions.get('window');
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const NAME_RE = /^[a-zA-Z\s-]{2,}$/;
 
 type Role = 'customer' | 'employee';
 
 export default function SignupScreen() {
   const router = useRouter();
   const C = useColors();
+  const insets = useSafeAreaInsets();
 
-  const [fullName,     setFullName]     = useState('');
+  const [firstName,    setFirstName]    = useState('');
+  const [lastName,     setLastName]     = useState('');
   const [email,        setEmail]        = useState('');
+  const [phoneNumber,  setPhoneNumber]  = useState('+63 ');
   const [password,     setPassword]     = useState('');
   const [role,         setRole]         = useState<Role>('customer');
   const [showPassword, setShowPassword] = useState(false);
   const [loading,      setLoading]      = useState(false);
 
-  const [errors, setErrors] = useState<{ name: string; email: string; password: string }>({ name: '', email: '', password: '' });
+  const [errors, setErrors] = useState<{ firstName: string; lastName: string; email: string; phone: string; password: string }>({ 
+    firstName: '', lastName: '', email: '', phone: '', password: '' 
+  });
 
-  function passwordStrength(pw: string): { bars: number; label: string; color: string } {
-    if (!pw)           return { bars: 0, label: '',       color: '' };
-    if (pw.length < 6) return { bars: 1, label: 'Weak',   color: C.error };
-    if (pw.length < 10)return { bars: 2, label: 'Fair',   color: C.warning };
-    return               { bars: 3, label: 'Strong', color: C.success };
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Phone auto-formatter for PH: +63 9XX XXX XXXX
+  const formatPhoneNumber = (text: string) => {
+    // Keep +63 prefix
+    let cleaned = text.replace(/[^\d]/g, '');
+    if (!cleaned.startsWith('63')) cleaned = '63' + cleaned;
+    
+    let formatted = '+63 ';
+    let mainPart = cleaned.substring(2); // After 63
+    
+    if (mainPart.length > 0) {
+      formatted += mainPart.substring(0, 3);
+      if (mainPart.length > 3) formatted += ' ' + mainPart.substring(3, 6);
+      if (mainPart.length > 6) formatted += ' ' + mainPart.substring(6, 10);
+    }
+    
+    return formatted.trim();
+  };
+
+  const handlePhoneChange = (text: string) => {
+    if (text.length < 4) {
+      setPhoneNumber('+63 ');
+      return;
+    }
+    const formatted = formatPhoneNumber(text);
+    setPhoneNumber(formatted);
+    if (errors.phone) validateField('phone', formatted);
+  };
+
+  function getPasswordStrength(pw: string) {
+    let score = 0;
+    if (pw.length >= 8) score++;
+    if (/[A-Z]/.test(pw)) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[^A-Za-z0-9]/.test(pw)) score++;
+
+    if (score === 0) return { bars: 0, label: '', color: '#e2e8f0' };
+    if (score <= 2) return { bars: 1, label: 'Weak', color: '#ef4444' };
+    if (score === 3) return { bars: 2, label: 'Fair', color: '#f59e0b' };
+    return { bars: 3, label: 'Strong', color: '#10b981' };
   }
 
-  const pw = passwordStrength(password);
+  const pwStrength = getPasswordStrength(password);
 
-  function validateFields(): boolean {
-    const e: typeof errors = { name: '', email: '', password: '' };
-    if (!fullName.trim())              e.name     = 'Full name is required.';
-    else if (fullName.trim().length < 2) e.name   = 'Name must be at least 2 characters.';
-    if (!email.trim())                 e.email    = 'Email is required.';
-    else if (!EMAIL_RE.test(email.trim())) e.email = 'Enter a valid email address.';
-    if (!password)                     e.password = 'Password is required.';
-    else if (password.length < 6)      e.password = 'Password must be at least 6 characters.';
-    setErrors(e);
-    return !e.name && !e.email && !e.password;
-  }
+  const validateField = (field: string, value: string) => {
+    let error = '';
+    switch (field) {
+      case 'firstName':
+        if (!value.trim()) error = 'First name required';
+        else if (!NAME_RE.test(value.trim())) error = 'Invalid name';
+        break;
+      case 'lastName':
+        if (!value.trim()) error = 'Last name required';
+        else if (!NAME_RE.test(value.trim())) error = 'Invalid name';
+        break;
+      case 'email':
+        if (!value.trim()) error = 'Email required';
+        else if (!EMAIL_RE.test(value.trim())) error = 'Invalid email address';
+        break;
+      case 'phone':
+        const digits = value.replace(/[^\d]/g, '');
+        if (digits.length < 12) error = 'Incomplete phone number';
+        else if (!digits.startsWith('639')) error = 'Must start with 9';
+        break;
+      case 'password':
+        if (value.length < 8) error = 'Minimum 8 characters';
+        else if (!/[A-Z]/.test(value)) error = 'Need 1 uppercase letter';
+        else if (!/[0-9]/.test(value)) error = 'Need 1 number';
+        else if (!/[^A-Za-z0-9]/.test(value)) error = 'Need 1 special char';
+        break;
+    }
+    setErrors(prev => ({ ...prev, [field]: error }));
+    return error === '';
+  };
+
+  const isFormValid = 
+    NAME_RE.test(firstName.trim()) &&
+    NAME_RE.test(lastName.trim()) &&
+    EMAIL_RE.test(email.trim()) &&
+    phoneNumber.replace(/[^\d]/g, '').length === 12 &&
+    password.length >= 8 &&
+    /[A-Z]/.test(password) &&
+    /[0-9]/.test(password) &&
+    /[^A-Za-z0-9]/.test(password);
 
   async function handleSignup() {
-    if (!validateFields()) return;
+    // Final check
+    const fv = validateField('firstName', firstName);
+    const lv = validateField('lastName', lastName);
+    const ev = validateField('email', email);
+    const pv = validateField('phone', phoneNumber);
+    const passv = validateField('password', password);
+
+    if (!fv || !lv || !ev || !pv || !passv) return;
+
     setLoading(true);
     try {
-      await signUp({ email, password, fullName, role });
+      const fullName = `${firstName.trim()} ${lastName.trim()}`;
+      await signUp({ email, password, fullName, phoneNumber, role });
     } catch (err: any) {
       const msg: string = err.message ?? 'Sign up failed.';
       if (msg.toLowerCase().includes('email')) {
@@ -69,183 +149,332 @@ export default function SignupScreen() {
   }
 
   return (
-    <SafeAreaView style={[st.safe, { backgroundColor: C.surface }]}>
+    <View style={[st.container, { backgroundColor: '#f0f4f8' }]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView contentContainerStyle={st.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={st.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} bounces={false}>
 
-          <TouchableOpacity style={[st.backBtn, { backgroundColor: C.surface2 }]} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={20} color={C.text2} />
-          </TouchableOpacity>
+          {/* Header Section */}
+          <LinearGradient 
+            colors={['#0c4a6e', '#0284c7']} 
+            start={{ x: 0, y: 0 }} 
+            end={{ x: 1, y: 1 }} 
+            style={[st.headerGradient, { paddingTop: Math.max(insets.top, 16) }]}
+          >
+            <View style={st.headerContent}>
+              <TouchableOpacity style={st.backBtn} onPress={() => router.back()}>
+                <Ionicons name="arrow-back" size={18} color="#fff" />
+              </TouchableOpacity>
+              <View style={st.headerTitleRow}>
+                <Ionicons name="sparkles" size={18} color="#fff" style={{ marginRight: 8 }} />
+                <Text style={st.headerTitle}>Create Account</Text>
+              </View>
+            </View>
+          </LinearGradient>
 
-          <View style={st.brand}>
-            <LinearGradient colors={['#1565C0', '#42A5F5']} style={st.brandIcon}>
-              <Ionicons name="sparkles" size={18} color="#fff" />
-            </LinearGradient>
-            <Text style={[st.brandName, { color: C.text1 }]}>CleanOps</Text>
-          </View>
-
-          <Text style={[st.title, { color: C.text1 }]}>Create account</Text>
-          <Text style={[st.sub, { color: C.text3 }]}>
-            Already have one?{' '}
-            <Link href="/login" style={[st.link, { color: C.blue600 }]}>Sign in</Link>
-          </Text>
-
-          {/* Role toggle */}
-          <View style={st.roleWrap}>
-            <Text style={[st.label, { color: C.text2 }]}>I AM A…</Text>
-            <View style={[st.roleToggle, { backgroundColor: C.surface2, borderColor: C.divider }]}>
-              {(['customer', 'employee'] as Role[]).map((r) => (
-                <TouchableOpacity
-                  key={r}
-                  style={[st.roleBtn, role === r && [st.roleBtnActive, { backgroundColor: C.surface }]]}
-                  onPress={() => setRole(r)}
+          <View style={st.formContainer}>
+            {/* Role Selection */}
+            <View style={st.roleSection}>
+              <Text style={[st.label, { color: '#62748e' }]}>I AM A...</Text>
+              <View style={st.roleGrid}>
+                <TouchableOpacity 
+                  style={[st.roleCard, role === 'customer' && st.roleCardActive]} 
+                  onPress={() => setRole('customer')}
                   activeOpacity={0.8}
                 >
-                  <Ionicons
-                    name={r === 'customer' ? 'person-outline' : 'briefcase-outline'}
-                    size={16}
-                    color={role === r ? C.blue700 : C.text3}
-                  />
-                  <Text style={[st.roleBtnText, { color: role === r ? C.blue700 : C.text3 }, role === r && st.roleBtnTextActive]}>
-                    {r === 'customer' ? 'Customer' : 'Employee'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={st.form}>
-            {/* Full name */}
-            <View style={st.field}>
-              <Text style={[st.label, { color: C.text2 }]}>FULL NAME</Text>
-              <View style={[st.inputRow, { backgroundColor: C.surface2, borderColor: errors.name ? C.error : C.divider }]}>
-                <TextInput
-                  style={[st.input, { color: C.text1 }]}
-                  placeholder="John Doe"
-                  placeholderTextColor={C.text3}
-                  value={fullName}
-                  onChangeText={(v) => { setFullName(v); if (errors.name) setErrors((p) => ({ ...p, name: '' })); }}
-                  autoCapitalize="words"
-                />
-                <Ionicons name="person-outline" size={18} color={errors.name ? C.error : C.text3} />
-              </View>
-              {!!errors.name && <Text style={[st.errorText, { color: C.error }]}>{errors.name}</Text>}
-            </View>
-
-            {/* Email */}
-            <View style={st.field}>
-              <Text style={[st.label, { color: C.text2 }]}>EMAIL</Text>
-              <View style={[st.inputRow, { backgroundColor: C.surface2, borderColor: errors.email ? C.error : C.divider }]}>
-                <TextInput
-                  style={[st.input, { color: C.text1 }]}
-                  placeholder="you@example.com"
-                  placeholderTextColor={C.text3}
-                  value={email}
-                  onChangeText={(v) => { setEmail(v); if (errors.email) setErrors((p) => ({ ...p, email: '' })); }}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                <Ionicons name="mail-outline" size={18} color={errors.email ? C.error : C.text3} />
-              </View>
-              {!!errors.email && <Text style={[st.errorText, { color: C.error }]}>{errors.email}</Text>}
-            </View>
-
-            {/* Password */}
-            <View style={st.field}>
-              <Text style={[st.label, { color: C.text2 }]}>PASSWORD</Text>
-              <View style={[st.inputRow, { backgroundColor: C.surface2, borderColor: errors.password ? C.error : C.divider }]}>
-                <TextInput
-                  style={[st.input, { color: C.text1 }]}
-                  placeholder="Min. 6 characters"
-                  placeholderTextColor={C.text3}
-                  value={password}
-                  onChangeText={(v) => { setPassword(v); if (errors.password) setErrors((p) => ({ ...p, password: '' })); }}
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                  <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={18} color={errors.password ? C.error : C.text3} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Strength meter */}
-              {password.length > 0 && (
-                <View style={st.strengthRow}>
-                  <View style={st.strengthBars}>
-                    {[0, 1, 2].map((i) => (
-                      <View key={i} style={[st.strengthBar, { backgroundColor: C.divider }, i < pw.bars && { backgroundColor: pw.color }]} />
-                    ))}
+                  <View style={[st.roleIconBox, { backgroundColor: role === 'customer' ? '#0284c7' : '#f1f5f9' }]}>
+                    <Ionicons name="person" size={18} color={role === 'customer' ? '#fff' : '#64748b'} />
                   </View>
-                  <Text style={[st.strengthLabel, { color: pw.color }]}>{pw.label}</Text>
-                </View>
-              )}
-              {!!errors.password && <Text style={[st.errorText, { color: C.error }]}>{errors.password}</Text>}
+                  <Text style={[st.roleCardTitle, { color: role === 'customer' ? '#0284c7' : '#0f172a' }]}>Customer</Text>
+                  <Text style={st.roleCardSub}>Post cleaning jobs</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[st.roleCard, role === 'employee' && st.roleCardActive]} 
+                  onPress={() => setRole('employee')}
+                  activeOpacity={0.8}
+                >
+                  <View style={[st.roleIconBox, { backgroundColor: role === 'employee' ? '#0284c7' : '#f1f5f9' }]}>
+                    <Ionicons name="briefcase" size={18} color={role === 'employee' ? '#fff' : '#64748b'} />
+                  </View>
+                  <Text style={[st.roleCardTitle, { color: role === 'employee' ? '#0284c7' : '#0f172a' }]}>Cleaner</Text>
+                  <Text style={st.roleCardSub}>Find & claim jobs</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
-            {/* Submit */}
-            <TouchableOpacity
-              style={[st.submitBtn, { backgroundColor: C.blue600, shadowColor: C.blue600 }, loading && st.disabled]}
-              onPress={handleSignup}
-              disabled={loading}
-              activeOpacity={0.85}
-            >
-              {loading
-                ? <ActivityIndicator color="#fff" />
-                : <><Text style={st.submitText}>Create account</Text><Ionicons name="arrow-forward" size={18} color="#fff" /></>
-              }
-            </TouchableOpacity>
+            <View style={st.form}>
+              {/* Split Name Fields */}
+              <View style={st.row}>
+                <View style={[st.field, { flex: 1 }]}>
+                  <Text style={[st.label, { color: '#62748e' }]}>First Name</Text>
+                  <View style={[st.inputRow, { borderColor: errors.firstName && touched.firstName ? '#ef4444' : '#e2e8f0', backgroundColor: '#fff' }]}>
+                    <TextInput
+                      style={[st.input, { color: '#0f172b' }]}
+                      placeholder="Alex"
+                      placeholderTextColor="rgba(15,23,42,0.5)"
+                      value={firstName}
+                      onChangeText={(v) => { setFirstName(v); if (errors.firstName) validateField('firstName', v); }}
+                      onBlur={() => { setTouched(p => ({...p, firstName: true})); validateField('firstName', firstName); }}
+                      autoCapitalize="words"
+                    />
+                  </View>
+                  {!!errors.firstName && touched.firstName && <Text style={[st.errorText, { color: '#ef4444' }]}>{errors.firstName}</Text>}
+                </View>
+                <View style={[st.field, { flex: 1 }]}>
+                  <Text style={[st.label, { color: '#62748e' }]}>Last Name</Text>
+                  <View style={[st.inputRow, { borderColor: errors.lastName && touched.lastName ? '#ef4444' : '#e2e8f0', backgroundColor: '#fff' }]}>
+                    <TextInput
+                      style={[st.input, { color: '#0f172b' }]}
+                      placeholder="Chen"
+                      placeholderTextColor="rgba(15,23,42,0.5)"
+                      value={lastName}
+                      onChangeText={(v) => { setLastName(v); if (errors.lastName) validateField('lastName', v); }}
+                      onBlur={() => { setTouched(p => ({...p, lastName: true})); validateField('lastName', lastName); }}
+                      autoCapitalize="words"
+                    />
+                  </View>
+                  {!!errors.lastName && touched.lastName && <Text style={[st.errorText, { color: '#ef4444' }]}>{errors.lastName}</Text>}
+                </View>
+              </View>
 
-            <Text style={[st.terms, { color: C.text3 }]}>
-              By signing up you agree to our{' '}
-              <Text style={[st.link, { color: C.blue600 }]}>Terms of Service</Text>
-              {' '}and{' '}
-              <Text style={[st.link, { color: C.blue600 }]}>Privacy Policy</Text>.
-            </Text>
+              {/* Email */}
+              <View style={st.field}>
+                <Text style={[st.label, { color: '#62748e' }]}>Email Address</Text>
+                <View style={[st.inputRow, { borderColor: errors.email && touched.email ? '#ef4444' : '#e2e8f0', backgroundColor: '#fff' }]}>
+                  <TextInput
+                    style={[st.input, { color: '#0f172b' }]}
+                    placeholder="you@example.com"
+                    placeholderTextColor="rgba(15,23,42,0.5)"
+                    value={email}
+                    onChangeText={(v) => { setEmail(v); if (errors.email) validateField('email', v); }}
+                    onBlur={() => { setTouched(p => ({...p, email: true})); validateField('email', email); }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+                {!!errors.email && touched.email && <Text style={[st.errorText, { color: '#ef4444' }]}>{errors.email}</Text>}
+              </View>
+
+              {/* Phone Number */}
+              <View style={st.field}>
+                <Text style={[st.label, { color: '#62748e' }]}>Phone Number</Text>
+                <View style={[st.inputRow, { borderColor: errors.phone && touched.phone ? '#ef4444' : '#e2e8f0', backgroundColor: '#fff' }]}>
+                  <TextInput
+                    style={[st.input, { color: '#0f172b' }]}
+                    placeholder="+63 9xx xxx xxxx"
+                    placeholderTextColor="rgba(15,23,42,0.5)"
+                    value={phoneNumber}
+                    onChangeText={handlePhoneChange}
+                    onBlur={() => { setTouched(p => ({...p, phone: true})); validateField('phone', phoneNumber); }}
+                    keyboardType="phone-pad"
+                    maxLength={16}
+                  />
+                </View>
+                {!!errors.phone && touched.phone && <Text style={[st.errorText, { color: '#ef4444' }]}>{errors.phone}</Text>}
+              </View>
+
+              {/* Password */}
+              <View style={st.field}>
+                <Text style={[st.label, { color: '#62748e' }]}>Password</Text>
+                <View style={[st.inputRow, { borderColor: errors.password && touched.password ? '#ef4444' : '#e2e8f0', backgroundColor: '#fff' }]}>
+                  <TextInput
+                    style={[st.input, { color: '#0f172b' }]}
+                    placeholder="••••••••"
+                    placeholderTextColor="rgba(15,23,42,0.5)"
+                    value={password}
+                    onChangeText={(v) => { setPassword(v); if (errors.password) validateField('password', v); }}
+                    onBlur={() => { setTouched(p => ({...p, password: true})); validateField('password', password); }}
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                  />
+                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={st.eyeIcon}>
+                    <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={18} color="rgba(15,23,42,0.5)" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Strength meter */}
+                {password.length > 0 && (
+                  <View style={st.strengthRow}>
+                    <View style={st.strengthBars}>
+                      {[0, 1, 2].map((i) => (
+                        <View key={i} style={[st.strengthBar, { backgroundColor: '#e2e8f0' }, i < pwStrength.bars && { backgroundColor: pwStrength.color }]} />
+                      ))}
+                    </View>
+                    <Text style={[st.strengthLabel, { color: pwStrength.color }]}>{pwStrength.label}</Text>
+                  </View>
+                )}
+                {!!errors.password && touched.password && <Text style={[st.errorText, { color: '#ef4444' }]}>{errors.password}</Text>}
+              </View>
+
+              {/* Submit */}
+              <TouchableOpacity
+                style={[st.submitBtnWrapper, (loading || !isFormValid) && st.disabled]}
+                onPress={handleSignup}
+                disabled={loading || !isFormValid}
+                activeOpacity={0.85}
+              >
+                <LinearGradient 
+                  colors={['#0ea5e9', '#0284c7']} 
+                  style={st.submitBtn}
+                >
+                  {loading
+                    ? <ActivityIndicator color="#fff" />
+                    : <Text style={st.submitText}>{role === 'customer' ? 'Create Customer Account' : 'Create Cleaner Account'}</Text>
+                  }
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <View style={st.footer}>
+                <Text style={[st.footerText, { color: '#90a1b9' }]}>Already have an account? </Text>
+                <TouchableOpacity onPress={() => router.push('/login')}>
+                  <Text style={[st.footerLink, { color: '#0284c7' }]}>Sign In</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const st = StyleSheet.create({
-  safe:   { flex: 1 },
-  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 32 },
+  container: { flex: 1 },
+  scroll: { flexGrow: 1, paddingBottom: 40 },
 
-  backBtn: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8, marginBottom: 28 },
+  headerGradient: {
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    paddingBottom: 24,
+    paddingHorizontal: 20,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+  },
 
-  brand:     { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 28 },
-  brandIcon: { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  brandName: { fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
+  formContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+  },
+  roleSection: {
+    marginBottom: 20,
+  },
+  roleGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  roleCard: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    borderRadius: 16,
+    padding: 16,
+    height: 118,
+  },
+  roleCardActive: {
+    borderColor: '#0284c7',
+    backgroundColor: '#e0f2fe',
+  },
+  roleIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  roleCardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  roleCardSub: {
+    fontSize: 12,
+    color: '#90a1b9',
+    fontWeight: '500',
+  },
 
-  title: { fontSize: Math.min(width * 0.07, 28), fontWeight: '800', letterSpacing: -0.4, marginBottom: 6 },
-  sub:   { fontSize: 14, marginBottom: 24 },
-  link:  { fontWeight: '700' },
+  row: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  form: { gap: 16 },
+  field: { marginBottom: 4 },
+  label: { 
+    fontSize: 12, 
+    fontWeight: '600', 
+    letterSpacing: 0.3, 
+    textTransform: 'uppercase', 
+    marginBottom: 6 
+  },
+  errorText: { fontSize: 11, fontWeight: '600', marginTop: 4 },
 
-  roleWrap: { marginBottom: 22 },
-  roleToggle: { flexDirection: 'row', borderWidth: 1.5, borderRadius: 12, padding: 4, gap: 4, marginTop: 8 },
-  roleBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 11, borderRadius: 9 },
-  roleBtnActive: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
-  roleBtnText:       { fontSize: 13, fontWeight: '500' },
-  roleBtnTextActive: { fontWeight: '700' },
+  inputRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    borderWidth: 1.5, 
+    borderRadius: 16, 
+    paddingHorizontal: 16, 
+    height: 50, 
+  },
+  input: { flex: 1, fontSize: 14 },
+  eyeIcon: {
+    paddingLeft: 12,
+  },
 
-  form: { gap: 0 },
-  field: { marginBottom: 18 },
-  label: { fontSize: 10, fontWeight: '700', letterSpacing: 0.9, textTransform: 'uppercase', marginBottom: 8 },
-  errorText: { fontSize: 12, fontWeight: '500', marginTop: 5 },
-
-  inputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 14, height: 50, gap: 8 },
-  input: { flex: 1, fontSize: 15 },
-
-  strengthRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  strengthRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
   strengthBars: { flex: 1, flexDirection: 'row', gap: 4 },
   strengthBar: { flex: 1, height: 3, borderRadius: 2 },
   strengthLabel: { fontSize: 11, fontWeight: '700', minWidth: 42, textAlign: 'right' },
 
-  submitBtn: { borderRadius: 14, height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6 },
-  submitText: { fontSize: 15, fontWeight: '800', color: '#fff' },
-  disabled:   { opacity: 0.55 },
+  submitBtnWrapper: {
+    marginTop: 8,
+    shadowColor: '#0284c7',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  submitBtn: { 
+    borderRadius: 16, 
+    height: 56, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    paddingHorizontal: 16,
+  },
+  submitText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  disabled:   { opacity: 0.5 },
 
-  terms: { fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 16 },
+  footer: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    marginTop: 8,
+  },
+  footerText: { fontSize: 12 },
+  footerLink: { fontSize: 16, fontWeight: '600' },
 });
