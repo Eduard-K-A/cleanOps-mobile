@@ -113,6 +113,7 @@ export async function getOpenJobs(): Promise<Job[]> {
     .from('jobs')
     .select('*')
     .eq('status', 'OPEN')
+    .is('worker_id', null)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -205,46 +206,43 @@ export async function applyForJob(jobId: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Unauthorized');
 
-  // Validation: Check if job is still OPEN
-  const { data: job } = await (supabase as any)
+  // 1. Fetch current job state with error checking
+  const { data: job, error: jobErr } = await (supabase as any)
     .from('jobs')
-    .select('status, custom_instructions')
-    .eq( 'id', jobId)
+    .select('status, worker_id')
+    .eq('id', jobId)
     .single();
 
+  if (jobErr) throw new Error(`Could not verify job status: ${jobErr.message}`);
+  
   if (!job || job.status !== 'OPEN') {
-    throw new Error('This job is no longer available.');
+    throw new Error('This job is no longer open for applications.');
   }
 
-  // Fetch employee details
-  const { data: profile } = await (supabase as any)
+  if (job.worker_id) {
+    throw new Error('This job already has an assigned cleaner.');
+  }
+
+  // 2. Fetch employee profile details
+  const { data: profile, error: profErr } = await (supabase as any)
     .from('profiles')
-    .select('full_name, avatar_url, rating')
+    .select('full_name, phone')
     .eq('id', user.id)
     .single();
 
-  // We'll store applicants in a hidden JSON block at the end of custom_instructions
-  // or a metadata field if available. For now, let's use a mock-ready update.
-  const currentApplicants = []; // In a real app, this would be a join table
-  const newApplicant = { 
-    id: user.id, 
-    name: profile?.full_name || 'Cleaner', 
-    avatar: profile?.avatar_url,
-    rating: profile?.rating || 5.0
-  };
+  if (profErr) throw new Error('Could not fetch your profile. Please check your settings.');
 
-  // For this mockup/premium flow, we'll "apply" by setting the worker fields 
-  // but keeping the status OPEN. The customer will then "Approve" them.
-  const { error } = await (supabase as any)
+  // 3. Update the job with the applicant's info
+  // For this flow, we set worker_name/phone to notify the customer
+  const { error: updateErr } = await (supabase as any)
     .from('jobs')
     .update({ 
-      worker_name: newApplicant.name,
-      worker_phone: user.phone || 'N/A', // SUPPOSE employee_id is used for candidate
-      // employee_id: user.id // Don't set this yet, or it counts as "claimed"
+      worker_name: profile?.full_name || 'Cleaner',
+      worker_phone: profile?.phone || 'N/A'
     })
     .eq('id', jobId);
 
-  if (error) throw error;
+  if (updateErr) throw new Error(`Application failed: ${updateErr.message}`);
 }
 
 export async function approveApplication(jobId: string, employeeId: string): Promise<void> {

@@ -10,7 +10,7 @@ import { getSettings, updateSettings, UserSettings } from '@/stores/settingsStor
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/authContext';
 
-export default function SecurityScreen() {
+export default function EmployeeSecurityScreen() {
   const router = useRouter();
   const C = useColors();
   const insets = useSafeAreaInsets();
@@ -70,7 +70,7 @@ export default function SecurityScreen() {
         <Text style={[st.sectionTitle, { color: C.text1 }]}>Authentication</Text>
         <View style={[st.card, { backgroundColor: C.surface, borderColor: C.divider }]}>
           <TouchableOpacity style={st.row} onPress={() => setPwdModal(true)}>
-            <View style={[st.iconWrap, { backgroundColor: '#fef2f2' }]}>
+            <View style={[st.iconWrap, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
               <Ionicons name="lock-closed-outline" size={20} color="#ef4444" />
             </View>
             <View style={{ flex: 1 }}>
@@ -81,7 +81,7 @@ export default function SecurityScreen() {
           </TouchableOpacity>
 
           <View style={[st.row, { borderTopWidth: 1, borderTopColor: C.divider }]}>
-            <View style={[st.iconWrap, { backgroundColor: '#f0f9ff' }]}>
+            <View style={[st.iconWrap, { backgroundColor: 'rgba(37, 99, 235, 0.1)' }]}>
               <Ionicons name="finger-print-outline" size={20} color={C.blue600} />
             </View>
             <View style={{ flex: 1 }}>
@@ -100,7 +100,7 @@ export default function SecurityScreen() {
         <Text style={[st.sectionTitle, { color: C.text1, marginTop: 32 }]}>Data & Privacy</Text>
         <View style={[st.card, { backgroundColor: C.surface, borderColor: C.divider }]}>
           <TouchableOpacity style={st.row} onPress={() => setPolicyModal(true)}>
-            <View style={[st.iconWrap, { backgroundColor: '#f8fafc' }]}>
+            <View style={[st.iconWrap, { backgroundColor: C.surface2 }]}>
               <Ionicons name="document-text-outline" size={20} color={C.text2} />
             </View>
             <View style={{ flex: 1 }}>
@@ -190,7 +190,7 @@ export default function SecurityScreen() {
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={[st.policyPara, { color: C.text2 }]}>
                 <Text style={{ fontWeight: '800' }}>1. Data Collection: </Text>
-                We collect information necessary for service fulfillment, including your name, email, phone number, and home address. This allows us to provide reliable cleaning services.
+                We collect information necessary for service fulfillment, including your name, email, phone number, and home address. For cleaners, we also collect background check information.
               </Text>
               <Text style={[st.policyPara, { color: C.text2 }]}>
                 <Text style={{ fontWeight: '800' }}>2. Home & Pet Info: </Text>
