@@ -4,14 +4,14 @@ import {
   Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/lib/authContext';
 import { useColors } from '@/lib/themeContext';
 import { useToast } from '@/lib/toastContext';
 import { updateProfile } from '@/actions/profile';
 
-export default function EditProfileScreen() {
+export default function EmployeeEditProfileScreen() {
   const router = useRouter();
   const { profile, refreshProfile } = useAuth();
   const C = useColors();
@@ -21,7 +21,6 @@ export default function EditProfileScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName,  setLastName]  = useState('');
   const [phone,     setPhone]     = useState(profile?.phone ?? '');
-  const [address,   setAddress]   = useState(profile?.location_address ?? ''); 
   const [saving,    setSaving]    = useState(false);
 
   useEffect(() => {
@@ -30,7 +29,6 @@ export default function EditProfileScreen() {
       setFirstName(parts[0] || '');
       setLastName(parts.slice(1).join(' ') || '');
       setPhone(profile.phone || '');
-      setAddress(profile.location_address || '');
     }
   }, [profile]);
 
@@ -46,7 +44,7 @@ export default function EditProfileScreen() {
     
     setSaving(true);
     try {
-      await updateProfile(fullName, phone, address);
+      await updateProfile(fullName, phone);
       await refreshProfile();
       toast.show('Profile updated successfully.');
       router.back();
@@ -68,8 +66,8 @@ export default function EditProfileScreen() {
         <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
           {/* Avatar Section */}
           <View style={st.avatarSection}>
-            <View style={[st.avatarLarge, { backgroundColor: C.blue600 }]}>
-               <Text style={st.avatarLargeText}>{firstName[0]?.toUpperCase() || 'U'}</Text>
+            <View style={[st.avatarLarge, { backgroundColor: '#1e293b' }]}>
+               <Text style={st.avatarLargeText}>{firstName[0]?.toUpperCase() || 'E'}</Text>
                <TouchableOpacity style={st.cameraBtn}>
                   <Ionicons name="camera" size={16} color="#fff" />
                </TouchableOpacity>
@@ -106,17 +104,6 @@ export default function EditProfileScreen() {
               <Text style={[st.fieldLabelSmall, { color: C.text2 }]}>Phone Number</Text>
               <View style={[st.inputRow, { backgroundColor: C.surface2, borderColor: C.divider }]}>
                 <TextInput style={[st.input, { color: C.text1 }]} value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
-              </View>
-            </View>
-          </View>
-
-          <Text style={[st.sectionHeader, { color: C.text3, marginTop: 24 }]}>DEFAULT LOCATION</Text>
-          <View style={[st.card, { backgroundColor: C.surface, borderColor: C.divider }]}>
-            <View style={st.fieldGroup}>
-              <Text style={[st.fieldLabelSmall, { color: C.text2 }]}>Service Address</Text>
-              <View style={[st.inputRow, { backgroundColor: C.surface2, borderColor: C.divider }]}>
-                <TextInput style={[st.input, { color: C.text1 }]} value={address} onChangeText={setAddress} multiline />
-                <Ionicons name="location-outline" size={16} color={C.text3} />
               </View>
             </View>
           </View>

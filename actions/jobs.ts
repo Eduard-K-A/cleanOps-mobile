@@ -61,7 +61,7 @@ export async function createJob(jobData: {
   const { error: escrowErr } = await (supabase as any).rpc('hold_escrow', {
     p_job_id: data.id,
     p_customer_id: user.id,
-    p_amount: jobData.price / 100,
+    p_amount: jobData.price,
   });
   if (escrowErr) {
     await (supabase as any).from('jobs').delete().eq('id', data.id);
@@ -93,7 +93,7 @@ export async function uploadProofImage(uri: string, userId: string): Promise<str
 
 export async function getCustomerJobs(status?: JobStatus): Promise<Job[]> {
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Unauthorized');
+  if (!user) return [];
 
   let query = (supabase as any)
     .from('jobs')
@@ -113,6 +113,7 @@ export async function getOpenJobs(): Promise<Job[]> {
     .from('jobs')
     .select('*')
     .eq('status', 'OPEN')
+    .is('worker_id', null)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -125,7 +126,7 @@ export async function getAllOpenJobs(): Promise<Job[]> {
 
 export async function getEmployeeJobs(status?: JobStatus): Promise<Job[]> {
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Unauthorized');
+  if (!user) return [];
 
   // Column is worker_id not employee_id
   let query = (supabase as any)
@@ -205,58 +206,71 @@ export async function applyForJob(jobId: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Unauthorized');
 
-  // Validation: Check if job is still OPEN
-  const { data: job } = await (supabase as any)
+  const { data: job, error: jobErr } = await (supabase as any)
     .from('jobs')
-    .select('status, custom_instructions')
-    .eq( 'id', jobId)
+    .select('status, worker_id, worker_name')
+    .eq('id', jobId)
     .single();
 
+  if (jobErr) throw new Error(`Could not verify job status: ${jobErr.message}`);
+
   if (!job || job.status !== 'OPEN') {
-    throw new Error('This job is no longer available.');
+    throw new Error('This job is no longer open for applications.');
   }
 
-  // Fetch employee details
-  const { data: profile } = await (supabase as any)
+  if (job.worker_id) {
+    throw new Error('This job already has an assigned cleaner.');
+  }
+
+  // Prevent overwriting another applicant's pending application
+  if (job.worker_name) {
+    throw new Error('Another cleaner has already applied. Please try a different job.');
+  }
+
+  const { data: profile, error: profErr } = await (supabase as any)
     .from('profiles')
-    .select('full_name, avatar_url, rating')
+    .select('full_name, phone')
     .eq('id', user.id)
     .single();
 
-  // We'll store applicants in a hidden JSON block at the end of custom_instructions
-  // or a metadata field if available. For now, let's use a mock-ready update.
-  const currentApplicants = []; // In a real app, this would be a join table
-  const newApplicant = { 
-    id: user.id, 
-    name: profile?.full_name || 'Cleaner', 
-    avatar: profile?.avatar_url,
-    rating: profile?.rating || 5.0
-  };
+  if (profErr) throw new Error('Could not fetch your profile. Please check your settings.');
 
-  // For this mockup/premium flow, we'll "apply" by setting the worker fields 
-  // but keeping the status OPEN. The customer will then "Approve" them.
-  const { error } = await (supabase as any)
+  const { error: updateErr } = await (supabase as any)
     .from('jobs')
-    .update({ 
-      worker_name: newApplicant.name,
-      worker_phone: user.phone || 'N/A', // SUPPOSE employee_id is used for candidate
-      // employee_id: user.id // Don't set this yet, or it counts as "claimed"
+    .update({
+      worker_id:    user.id,
+      worker_name:  profile?.full_name || 'Cleaner',
+      worker_phone: profile?.phone     || 'N/A',
     })
     .eq('id', jobId);
 
-  if (error) throw error;
+  if (updateErr) throw new Error(`Application failed: ${updateErr.message}`);
 }
 
 export async function approveApplication(jobId: string, employeeId: string): Promise<void> {
-  // Use the existing claim_job RPC to officially assign and start the job
-  const { error } = await (supabase as any).rpc('claim_job', {
-    p_job_id: jobId,
+  if (!employeeId) throw new Error('No employee selected to approve.');
+
+  // Uses approve_job_application RPC (migration 024) — customer-callable, sets worker_id + IN_PROGRESS
+  const { error } = await (supabase as any).rpc('approve_job_application', {
+    p_job_id:      jobId,
     p_employee_id: employeeId,
   });
 
   if (error) throw error;
-  
-  // Status is now IN_PROGRESS via RPC
+}
+
+export async function rejectApplication(jobId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Unauthorized');
+
+  const { error } = await (supabase as any)
+    .from('jobs')
+    .update({ worker_id: null, worker_name: null, worker_phone: null })
+    .eq('id', jobId)
+    .eq('customer_id', user.id)
+    .eq('status', 'OPEN');
+
+  if (error) throw error;
 }
 
 export async function cancelJob(jobId: string): Promise<void> {
@@ -276,7 +290,7 @@ export async function cancelJob(jobId: string): Promise<void> {
   }
 
   // Refund logic: Return price_amount to user balance
-  const refundAmount = job.price_amount / 100;
+  const refundAmount = job.price_amount;
   const { error: refundErr } = await (supabase as any).rpc('add_money', {
     user_id: user.id,
     amount: refundAmount,
@@ -326,13 +340,13 @@ export async function approveJobCompletion(jobId: string): Promise<void> {
 
   if (!job || (job as any).customer_id !== user.id) throw new Error('Forbidden');
 
-  // Use release_escrow RPC — same as web
-  const platformFee = Math.round((job as any).price_amount * 0.15);
+  // 10% platform fee — consistent with what's shown throughout the UI
+  const platformFee = Math.round((job as any).price_amount * 0.10);
   const { error: escrowError } = await (supabase as any).rpc('release_escrow', {
     p_job_id: jobId,
     p_employee_id: (job as any).worker_id,
-    p_amount: (job as any).price_amount / 100,
-    p_platform_fee: platformFee / 100,
+    p_amount: (job as any).price_amount,
+    p_platform_fee: platformFee,
   });
 
   if (escrowError) throw escrowError;
@@ -340,11 +354,10 @@ export async function approveJobCompletion(jobId: string): Promise<void> {
   await updateJobStatus(jobId, 'COMPLETED');
 }
 
-export async function getNearbyJobs(lat: number, lng: number, radiusMeters = 50000): Promise<Job[]> {
+// Uses the updated get_nearby_jobs RPC (migration 023) which queries by distance column, not PostGIS coords
+export async function getNearbyJobs(radiusKm = 50): Promise<Job[]> {
   const { data, error } = await (supabase as any).rpc('get_nearby_jobs', {
-    lat,
-    lng,
-    radius_meters: radiusMeters,
+    radius_km: radiusKm,
   });
   if (error) throw error;
   return (data ?? []).map(normalizeJob);

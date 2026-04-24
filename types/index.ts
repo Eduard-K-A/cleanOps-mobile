@@ -7,14 +7,15 @@ export type PaymentType = 'card' | 'e-wallet';
 
 export interface PaymentMethod {
   id: string;
+  user_id: string;
   type: PaymentType;
   brand: PaymentBrand;
   last4?: string;
   expiry?: string;
-  cvc?: string;
   cardholderName?: string;
   phoneNumber?: string;
   isDefault: boolean;
+  created_at: string;
 }
 
 export interface Profile {
@@ -27,7 +28,24 @@ export interface Profile {
   onboarding_completed?: boolean;
   rating?: number;
   total_jobs?: number;
+  settings: {
+    pushNotifications: boolean;
+    emailUpdates: boolean;
+    smsAlerts: boolean;
+    promos: boolean;
+    biometrics: boolean;
+  };
+  service_radius: number;
+  location_address?: string;
   created_at: string;
+}
+
+export interface EmployeeAvailability {
+  employee_id: string;
+  schedule: Record<string, boolean>;
+  shift_start: string;
+  shift_end: string;
+  updated_at: string;
 }
 
 export interface Job {
@@ -50,6 +68,15 @@ export interface Job {
   custom_instructions?: string;
   created_at: string;
   updated_at?: string;
+}
+
+export interface WithdrawalTransaction {
+  id: string;
+  amount: number;
+  method_brand: PaymentBrand;
+  method_last4: string;
+  method_name?: string;
+  created_at: string;
 }
 
 export interface Message {

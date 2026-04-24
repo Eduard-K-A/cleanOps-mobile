@@ -7,21 +7,15 @@ export function isValidCardNumber(cardNumber: string): boolean {
 }
 
 /**
- * Validates card expiry in MM/YY format
+ * Validates card expiry in MM/YY format (Lenient for mockup)
  */
 export function isValidExpiry(expiry: string): boolean {
   if (!/^\d{2}\/\d{2}$/.test(expiry)) return false;
 
-  const [month, year] = expiry.split('/').map(n => parseInt(n));
+  const [month] = expiry.split('/').map(n => parseInt(n));
   if (month < 1 || month > 12) return false;
 
-  const now = new Date();
-  const currentMonth = now.getMonth() + 1;
-  const currentYear = parseInt(now.getFullYear().toString().slice(-2));
-
-  if (year < currentYear) return false;
-  if (year === currentYear && month < currentMonth) return false;
-
+  // We'll skip the current date check to make it more mockup friendly
   return true;
 }
 
@@ -34,10 +28,10 @@ export function isValidCVC(cvc: string): boolean {
 
 /**
  * Validates Philippine mobile number for GCash/Maya
- * Since prefix is +63, we expect exactly 10 digits starting with 9
+ * Strictly 10 digits starting with 9
  */
 export function isValidPHMobile(phone: string): boolean {
-  const digits = phone.replace(/\s+/g, '');
+  const digits = phone.replace(/\D/g, '');
   return /^9\d{9}$/.test(digits);
 }
 
@@ -49,14 +43,13 @@ export function isValidCardholder(name: string): boolean {
 }
 
 /**
- * Validates address: length > 15, contains at least one number,
- * and a common street keyword (St, Ave, Blvd, Brgy, etc.)
+ * Validates address: length >= 10 and contains at least one space
+ * (e.g., '123 Main St' or 'Brgy Central')
  */
 export function isStrictAddress(address: string): boolean {
   const trimmed = address.trim();
-  const hasNumber = /\d/.test(trimmed);
-  const hasStreetKeyword = /\b(st|ave|blvd|rd|ln|dr|ct|way|brgy|village|road|street|avenue|boulevard)\b/i.test(trimmed);
-  return trimmed.length >= 15 && hasNumber && hasStreetKeyword;
+  const hasSpace = trimmed.includes(' ');
+  return trimmed.length >= 10 && hasSpace;
 }
 
 /**
